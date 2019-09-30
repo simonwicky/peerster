@@ -18,8 +18,8 @@ func main() {
 	_ = simple
 	 
 	gossiper := NewGossiper("127.0.0.1:" + *udpPort, *gossipAddr, *name, *peers)
+	gossiper.HandlePeers() 
 	gossiper.HandleClient()
-	//gossiper.HandlePeers() 
 }
 
 

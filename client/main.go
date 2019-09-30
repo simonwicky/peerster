@@ -36,7 +36,6 @@ func send(packet *utils.GossipPacket, addr string) {
 		fmt.Println("Could not serialize packet")
 		return
 	}
-	fmt.Println(packet.Simple.Contents)
 	n,_ := conn.Write(packetBytes)
 
 	fmt.Println("Packet sent to " + udpAddr.String() + " size: ",n)
