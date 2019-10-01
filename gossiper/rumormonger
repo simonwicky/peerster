@@ -1,0 +1,14 @@
+package gossiper
+
+import ( _ "net"
+		 _ "fmt"
+		 _ "os"
+		 _ "strings"
+		 _ "github.com/dedis/protobuf"
+		 _ "github.com/simonwicky/Peerster/utils"
+		 _ "math/rand"
+		 _ "time"
+)
+type Rumormonger struct {
+	
+}

@@ -13,7 +13,8 @@ func main() {
 	flag.Parse()
 
 	message := utils.SimpleMessage{Contents : *msg}
-	packetToSend := utils.GossipPacket{Simple: &message}
+	rumor := utils.RumorMessage{Text : *msg}
+	packetToSend := utils.GossipPacket{Simple: &message, Rumor: &rumor}
 	send(&packetToSend, "127.0.0.1:" + *uiPort)
 
 }

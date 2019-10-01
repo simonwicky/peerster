@@ -6,6 +6,27 @@ type SimpleMessage struct {
 	Contents string
 }
 
+type RumorMessage struct {
+	Origin string
+	ID	uint32
+	Text string
+}
+type RumorMessageKey struct {
+	Origin string
+	ID uint32
+}
+
+type PeerStatus struct {
+	Identifer string
+	NextID uint32
+}
+
+type StatusPacket struct {
+	Want []PeerStatus
+}
+
 type GossipPacket struct {
 	Simple *SimpleMessage
+	Rumor *RumorMessage
+	Status *StatusPacket
 }

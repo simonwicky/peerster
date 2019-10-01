@@ -1,9 +1,7 @@
 package main
 
 import ("flag"
-		_ "fmt"
-		_ "github.com/simonwicky/Peerster/utils"
-		_ "net"
+		"github.com/simonwicky/Peerster/gossiper"
 )
 
 
@@ -15,21 +13,11 @@ func main() {
 	var peers = flag.String("peers", "","comma separated list of peers of the form ip:port")
 	var simple = flag.Bool("simple", false, "run gossiper in simple broadcast mode")
 	flag.Parse()
-	_ = simple
 	 
-	gossiper := NewGossiper("127.0.0.1:" + *udpPort, *gossipAddr, *name, *peers)
-	gossiper.HandlePeers() 
-	gossiper.HandleClient()
+	gossiper := gossiper.NewGossiper("127.0.0.1:" + *udpPort, *gossipAddr, *name, *peers)
+	gossiper.PeersHandle(*simple) 
+	gossiper.ClientHandle(*simple)
 }
 
 
 
-
-
-func receiveClient(){
-
-}
-
-func receivePeers(){
-
-}
