@@ -21,6 +21,8 @@ type Gossiper struct {
 	currentStatus utils.StatusPacket
 	counter uint32
 	messages map[utils.RumorMessageKey]utils.RumorMessage
+	ticker *time.Ticker
+	workers map[string] *Rumormonger
 
 }
 
@@ -63,6 +65,26 @@ func NewGossiper(clientAddress, address, name, peers string) *Gossiper {
 		Name: name,
 		knownPeers: peersArray,
 		counter: 1,
+		messages : make(map[utils.RumorMessageKey]utils.RumorMessage,10),
+		workers : make(map[string]*Rumormonger),
+		ticker : time.NewTicker(time.Second * 10),
+	}
+}
+
+func (g *Gossiper) Start(simple bool){
+	go g.ClientHandle(simple)
+	if !simple {
+		go g.antiEntropy()
+	}
+
+	g.PeersHandle(simple) 
+}
+
+func (g *Gossiper) antiEntropy(){
+	for {
+		_ = <- g.ticker.C
+		g.sendToRandomPeer(&utils.GossipPacket{Status : &g.currentStatus})
+		fmt.Println("Sending antientropy")
 	}
 }
 
@@ -89,6 +111,17 @@ func (g *Gossiper) sendToKnowPeers(exception string, packet *utils.GossipPacket)
 		g.sendToPeer(peer, packet)
 	}
 }
+func (g *Gossiper) sendToRandomPeer(packet *utils.GossipPacket) string{
+	if len(g.knownPeers) > 0 {
+		nextPeerAddr := g.knownPeers[rand.Intn(len(g.knownPeers))]
+		g.sendToPeer(nextPeerAddr, packet)
+		return nextPeerAddr
+	} else {
+		fmt.Println("No known peers")
+		return ""
+	}
+}
+
 
 func (g *Gossiper) sendToPeer(peer string, packet *utils.GossipPacket){
 		address, err := net.ResolveUDPAddr("udp4",peer)
@@ -96,79 +129,27 @@ func (g *Gossiper) sendToPeer(peer string, packet *utils.GossipPacket){
 			fmt.Fprintln(os.Stderr, "Unable to resolve adress " + peer)
 			return
 		}
-		// connexion, err := net.DialUDP("udp4",g.addressPeer, address)
-		// if err != nil {
-		// 	fmt.Fprintln(os.Stderr, "Unable to connect to " + peer + err.Error())
-		// 	return
-		// }
-		// defer connexion.Close()
 		packetBytes, err := protobuf.Encode(packet)
 		if err != nil {
 			fmt.Println("Could not serialize packet")
 			return
 		}
 		n,_ := g.connPeer.WriteToUDP(packetBytes,address)
-
 		fmt.Println("Packet sent to " + address.String() + " size: ",n)
 }
-//================================================================
-//CLIENT SIDE
-//================================================================
 
-//loop handling the client side
-func (g *Gossiper) ClientHandle(simple bool){
-	//go func() {
-		fmt.Println("Listening on " + g.addressClient.String())
-		var packetBytes []byte = make([]byte, 1024)	
-		for {
-			var packet utils.GossipPacket
-			n,_,err := g.connClient.ReadFromUDP(packetBytes)
-			if err != nil {
-				fmt.Println("Error!")
-				return
-			}
-
-			if n > 0 {
-				protobuf.Decode(packetBytes, &packet)
-				switch {
-					case simple:
-						g.clientSimpleMessageHandler(&packet)
-					case packet.Rumor != nil :
-						g.clientRumorHandler(&packet)
-					case packet.Status != nil :
-						g.clientStatusHandler(&packet)
-				}
-
-			}		
-
-		}
-	//}()
+func (g *Gossiper) updateStatus(status utils.PeerStatus, index int){
+	fmt.Println("Status update")
+	if index == -1 {
+		g.currentStatus.Want = append(g.currentStatus.Want, status)
+	} else {
+		g.currentStatus.Want[index].NextID += 1
+	}
 }
 
-func (g *Gossiper) clientSimpleMessageHandler(packet *utils.GossipPacket) {
-	fmt.Println("CLIENT MESSAGE " + packet.Simple.Contents)
-
-	packet.Simple.OriginalName = g.Name
-	packet.Simple.RelayPeerAddr = g.addressPeer.String()
-	//sending to known peers
-	g.sendToKnowPeers("", packet)
-}
-
-func (g *Gossiper) clientRumorHandler(packet *utils.GossipPacket) {
-	fmt.Println("CLIENT MESSAGE " + packet.Rumor.Text)
-	packet.Rumor.Origin = g.Name
-	packet.Rumor.ID = g.counter
-	g.counter += 1
-	nextPeerAddr := g.knownPeers[rand.Intn(len(g.knownPeers))]
-	g.sendToPeer(nextPeerAddr, packet)
-	//add the message to storage
-	key := utils.RumorMessageKey{Origin : packet.Rumor.Origin, ID : packet.Rumor.ID}
-	g.messages[key] = *packet.Rumor
-
-}
-
-func (g *Gossiper) clientStatusHandler(packet *utils.GossipPacket) {
-
+func (g *Gossiper) addMessage(rumor *utils.RumorMessage){
+	key := utils.RumorMessageKey{Origin : rumor.Origin, ID : rumor.ID}
+	g.messages[key] = *rumor
 }
 
 //================================================================
@@ -177,7 +158,6 @@ func (g *Gossiper) clientStatusHandler(packet *utils.GossipPacket) {
 
 //loop handling the peer side
 func (g *Gossiper) PeersHandle(simple bool){
-	go func(){
 		fmt.Println("Listening on " + g.addressPeer.String())
 		var packetBytes []byte = make([]byte, 1024)	
 		for {
@@ -189,88 +169,33 @@ func (g *Gossiper) PeersHandle(simple bool){
 			}
 			if n > 0 {
 				protobuf.Decode(packetBytes, &packet)
-				switch {
-					case simple:
-						g.peersSimpleMessageHandler(&packet)
-					case packet.Rumor != nil :
-						g.peersRumorHandler(&packet,address.String())
-					case packet.Status != nil :
-						g.peersStatusHandler(&packet,address.String())
+				if simple {
+					g.peersSimpleMessageHandler(&packet)
+				} else {
+					if worker, ok := g.workers[address.String()]; ok {
+						worker.Buffer <- *utils.CopyGossipPacket(&packet)
+					} else {
+						worker = NewRumormonger(g, address.String(), make(chan utils.GossipPacket, 20))
+						g.workers[address.String()] = worker
+						new := *utils.CopyGossipPacket(&packet)
+						worker.Buffer <- new 
+						go func(){
+							worker.Start()
+							defer delete(g.workers, address.String())
+						}()
+					}
 				}
 			}
 		}
-	}()
 }
 
 func (g *Gossiper) peersSimpleMessageHandler(packet *utils.GossipPacket) {
 
-	fmt.Printf("SIMPLE MESSAGE origin %s from %s contents %s\n",packet.Simple.OriginalName, packet.Simple.RelayPeerAddr, packet.Simple.Contents)
+	utils.LogSimpleMessage(packet.Simple)
 	relayPeer := packet.Simple.RelayPeerAddr
 	packet.Simple.RelayPeerAddr = g.addressPeer.String()
 	g.addToKnownPeers(relayPeer)
-	fmt.Println("PEERS " + strings.Join(g.knownPeers,","))
+	utils.LogPeers(g.knownPeers)
 	g.sendToKnowPeers(relayPeer, packet)
 }
 
-func (g *Gossiper) peersRumorHandler(packet *utils.GossipPacket, address string) {
-	fmt.Printf("RUMOR MESSAGE origin %s from %s ID %d contents %s\n",packet.Rumor.Origin,address,packet.Rumor.ID,packet.Rumor.Text)
-	newGossiper := g.addToKnownPeers(address)
-	newMessage := false
-	fmt.Println( "PEERS " + strings.Join(g.knownPeers,","))
-
-	if newGossiper {
-		g.currentStatus.Want = append(g.currentStatus.Want, utils.PeerStatus{Identifer : packet.Rumor.Origin, NextID : packet.Rumor.ID + 1})
-	} else {
-
-		//check if new message from known gossiper
-		for index,status := range g.currentStatus.Want {
-			if packet.Rumor.Origin == status.Identifer && packet.Rumor.ID == status.NextID{
-				//update status
-				g.currentStatus.Want[index].NextID += 1
-				newMessage = true
-			}
-		}
-	}
-
-	if newMessage || newGossiper {
-		nextPeerAddr := g.knownPeers[rand.Intn(len(g.knownPeers))]
-		g.sendToPeer(nextPeerAddr, packet)
-		//TODO: implement the no response case
-	}
-	//acknowledge the message
-	ack := utils.GossipPacket{Status : &g.currentStatus}
-	g.sendToPeer(address, &ack)
-}
-
-func (g *Gossiper) peersStatusHandler(packet *utils.GossipPacket, address string) {
-	fmt.Printf("STATUS from %s ", address)
-	for _, status := range packet.Status.Want {
-		fmt.Printf("peer %s nextID %d ", status.Identifer, status.NextID)
-	}
-	fmt.Printf("\n")
-
-	for _, localStatus := range g.currentStatus.Want {
-		for _,extStatus := range packet.Status.Want {
-			//both knows the origin
-			if localStatus.Identifer == extStatus.Identifer {
-				if localStatus.NextID < extStatus.NextID {
-					status := utils.GossipPacket{Status : &g.currentStatus}
-					g.sendToPeer(address, &status)
-					return
-				}
-				if localStatus.NextID > extStatus.NextID {
-					key := utils.RumorMessageKey{Origin: extStatus.Identifer, ID: extStatus.NextID}
-					msg := g.messages[key]
-					g.sendToPeer(address, &utils.GossipPacket{Rumor : &msg})
-					return
-				}	
-			} else {
-
-			}
-		}
-	}
-	//handle unknown gossiper
-	//in sync, flip a coin to continue
-	fmt.Printf("IN SYNC WITH %s\n",address)
-
-}
