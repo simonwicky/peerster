@@ -87,7 +87,9 @@ func (r *Rumormonger) rumorHandler(packet *utils.GossipPacket) {
 		}
 	}
 	//acknowledge the message
+	r.G.currentStatus_lock.RLock()
 	ack := utils.GossipPacket{Status : &r.G.currentStatus}
+	r.G.currentStatus_lock.RUnlock()
 	r.G.sendToPeer(r.address, &ack)
 
 	if newMessage || newGossiper {
@@ -101,7 +103,6 @@ func (r *Rumormonger) rumorHandler(packet *utils.GossipPacket) {
 
 func (r *Rumormonger) statusHandler(packet *utils.GossipPacket) {
 	utils.LogStatus(packet.Status.Want,r.address)
-	utils.LogStatus(r.G.currentStatus.Want, r.G.Name)
 
 	gossip := r.checkVectorClock(packet.Status)
 	if gossip == nil {
@@ -114,6 +115,8 @@ func (r *Rumormonger) statusHandler(packet *utils.GossipPacket) {
 
 //returns a packet containing a rumor or a message to send, nil if peers are synced
 func (r *Rumormonger) checkVectorClock(status *utils.StatusPacket) *utils.GossipPacket {
+	r.G.currentStatus_lock.RLock()
+	defer r.G.currentStatus_lock.RUnlock()
 	for _, localStatus := range r.G.currentStatus.Want {
 		if r.missingPeer(localStatus.Identifer,status.Want){
 			//other node doesn't know peer from local status
@@ -150,6 +153,8 @@ func (r *Rumormonger) checkVectorClock(status *utils.StatusPacket) *utils.Gossip
 
 //check if peer is missing from want or not
 func (r *Rumormonger) missingPeer(peerIdentifier string, want []utils.PeerStatus) bool {
+	r.G.currentStatus_lock.RLock()
+	defer r.G.currentStatus_lock.RUnlock()
 	for _, s := range want {
 		if s.Identifer == peerIdentifier {
 			return false

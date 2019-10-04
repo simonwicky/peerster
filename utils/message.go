@@ -16,6 +16,8 @@ type RumorMessageKey struct {
 	ID uint32
 }
 
+type RumorMessages []RumorMessage
+
 type PeerStatus struct {
 	Identifer string
 	NextID uint32

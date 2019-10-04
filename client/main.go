@@ -14,6 +14,7 @@ func main() {
 
 	message := utils.SimpleMessage{Contents : *msg}
 	rumor := utils.RumorMessage{Text : *msg}
+	//no tag simple here, so we send simple + rumor
 	packetToSend := utils.GossipPacket{Simple: &message, Rumor: &rumor}
 	send(&packetToSend, "127.0.0.1:" + *uiPort)
 

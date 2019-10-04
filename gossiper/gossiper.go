@@ -8,6 +8,7 @@ import ("net"
 		"github.com/simonwicky/Peerster/utils"
 		"math/rand"
 		"time"
+		"sync"
 )
 
 
@@ -19,10 +20,14 @@ type Gossiper struct {
 	Name string
 	knownPeers []string
 	currentStatus utils.StatusPacket
+	currentStatus_lock sync.RWMutex
 	counter uint32
+	counter_lock sync.Mutex
 	messages map[utils.RumorMessageKey]utils.RumorMessage
 	ticker *time.Ticker
 	workers map[string] *Rumormonger
+	uiBuffer chan utils.GossipPacket
+	latestRumors *utils.RumorKeyQueue
 
 }
 
@@ -68,22 +73,26 @@ func NewGossiper(clientAddress, address, name, peers string) *Gossiper {
 		messages : make(map[utils.RumorMessageKey]utils.RumorMessage,10),
 		workers : make(map[string]*Rumormonger),
 		ticker : time.NewTicker(time.Second * 10),
+		uiBuffer : make(chan utils.GossipPacket, 10),
+		latestRumors : utils.NewRumorKeyQueue(20),
 	}
 }
 
 func (g *Gossiper) Start(simple bool){
 	go g.ClientHandle(simple)
 	if !simple {
-		go g.antiEntropy()
+		//go g.antiEntropy()
 	}
-
+	go g.HttpServerHandler()
 	g.PeersHandle(simple) 
 }
 
 func (g *Gossiper) antiEntropy(){
 	for {
 		_ = <- g.ticker.C
+		g.currentStatus_lock.RLock()
 		g.sendToRandomPeer(&utils.GossipPacket{Status : &g.currentStatus})
+		g.currentStatus_lock.RUnlock()
 		fmt.Println("Sending antientropy")
 	}
 }
@@ -94,6 +103,7 @@ func (g *Gossiper) antiEntropy(){
 
 
 func (g *Gossiper) addToKnownPeers(address string) bool {
+	fmt.Printf("Adding peer %s to known peers", address)
 	for _, peer := range g.knownPeers {
 		if peer == address {
 			return false
@@ -140,16 +150,19 @@ func (g *Gossiper) sendToPeer(peer string, packet *utils.GossipPacket){
 
 func (g *Gossiper) updateStatus(status utils.PeerStatus, index int){
 	fmt.Println("Status update")
+	g.currentStatus_lock.Lock()
 	if index == -1 {
 		g.currentStatus.Want = append(g.currentStatus.Want, status)
 	} else {
 		g.currentStatus.Want[index].NextID += 1
 	}
+	g.currentStatus_lock.Unlock()
 }
 
 func (g *Gossiper) addMessage(rumor *utils.RumorMessage){
 	key := utils.RumorMessageKey{Origin : rumor.Origin, ID : rumor.ID}
 	g.messages[key] = *rumor
+	g.latestRumors.Push(key)
 }
 
 //================================================================

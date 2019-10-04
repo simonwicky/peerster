@@ -28,8 +28,7 @@ func (g *Gossiper) ClientHandle(simple bool){
 						g.clientSimpleMessageHandler(&packet)
 					case packet.Rumor != nil :
 						g.clientRumorHandler(&packet)
-					case packet.Status != nil :
-						g.clientStatusHandler(&packet)
+					//case packet.Status != nil :
 				}
 
 			}		
@@ -57,14 +56,11 @@ func (g *Gossiper) clientRumorHandler(packet *utils.GossipPacket) {
 		}
 	}
 	g.updateStatus(utils.PeerStatus{Identifer : packet.Rumor.Origin, NextID : packet.Rumor.ID + 1}, statusIndex)
+	g.counter_lock.Lock()
 	g.counter += 1
+	g.counter_lock.Unlock()
 	g.sendToRandomPeer(packet)
 	//add the message to storage
-	key := utils.RumorMessageKey{Origin : packet.Rumor.Origin, ID : packet.Rumor.ID}
-	g.messages[key] = *packet.Rumor
-
-}
-
-func (g *Gossiper) clientStatusHandler(packet *utils.GossipPacket) {
+	g.addMessage(packet.Rumor)
 
 }
