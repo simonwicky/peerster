@@ -1,6 +1,7 @@
 package gossiper
 
 import ( "fmt"
+		"os"
 		 "github.com/simonwicky/Peerster/utils"
 		 "math/rand"
 		 "time"
@@ -28,7 +29,7 @@ func NewRumormonger(gossiper *Gossiper, address string, buffer chan utils.Gossip
 }
 
 func (r *Rumormonger) Start() {
-	fmt.Printf("STARTING talking with %s\n", r.address)
+	fmt.Fprintf(os.Stderr,"STARTING talking with %s\n", r.address)
 	for {
 		select {
 		case packet := <- r.Buffer :
@@ -128,7 +129,6 @@ func (r *Rumormonger) checkVectorClock(status *utils.StatusPacket) *utils.Gossip
 			if localStatus.Identifer == extStatus.Identifer {
 				if localStatus.NextID < extStatus.NextID {
 					status := utils.GossipPacket{Status : &r.G.currentStatus}
-					fmt.Println("HERE")
 					return &status
 				}
 				if localStatus.NextID > extStatus.NextID {

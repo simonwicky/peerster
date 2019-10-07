@@ -1,6 +1,5 @@
 package utils
 
-import ("fmt")
 
 type RumorKeyQueue struct {
 	Container []RumorMessageKey
@@ -22,11 +21,7 @@ func (r *RumorKeyQueue) Push(key RumorMessageKey) {
 	if r.currentSize > r.size {
 		r.Container = r.Container[1:]
 		r.currentSize -= 1
-		fmt.Println(r.Container)
 	}
-	fmt.Println(r.Container)
-	fmt.Println(r.currentSize)
-	fmt.Println(r.size)
 	return
 }
 

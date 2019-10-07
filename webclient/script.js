@@ -21,38 +21,7 @@ $(document).ready(function(){
 		});
 	}
 
-	$("#send").click(function(){
-		var text = $("#message").val();
-		document.getElementById("message").value = "";
-		var rumor = {
-				Origin:"",
-				ID:0,
-				Text:text,
-		};
-		$.ajax({
-			type: "POST",
-			url:"/message",
-			data:JSON.stringify(rumor),
-		});
-	});
-
-	$("#refresh-message").click(function(){
-		updateMessages()
-	});
-
-
-	$("#add-peer").click(function(){
-		var peer = $("#peer-text").val();
-		document.getElementById("peer-text").value = "";
-
-		$.ajax({
-			type: "POST",
-			url:"/node",
-			data:peer,
-		});
-	});
-
-	$("#refresh-peer").click(function(){
+	function updatePeers(){
 
 		$.ajax({
 			type: "GET",
@@ -72,19 +41,60 @@ $(document).ready(function(){
 				nodeBox.appendChild(ul);
 			}
 		});
+	}
+
+	$("#send").click(function(){
+		var text = $("#message").val();
+		document.getElementById("message").value = "";
+		var rumor = {
+				Origin:"",
+				ID:0,
+				Text:text,
+		};
+		$.ajax({
+			type: "POST",
+			url:"/message",
+			data:JSON.stringify(rumor),
+		});
 	});
 
+	$("#refresh-message").click(updateMessages());
+
+
+	$("#add-peer").click(function(){
+		var peer = $("#peer-text").val();
+		document.getElementById("peer-text").value = "";
+
+		$.ajax({
+			type: "POST",
+			url:"/node",
+			data:peer,
+		});
+	});
+
+	$("#refresh-peer").click(updatePeers());
+
 	
-	$.ajax({
-		type: "GET",
-		url: "/id",
-		datatype: "string",
-		success: function(data,status) {
-			if (data == ""){
-				data = "Unknown";
+	function getID(){
+		$.ajax({
+			type: "GET",
+			url: "/id",
+			datatype: "string",
+			success: function(data,status) {
+				if (data == ""){
+					data = "Unknown";
+				}
+				document.getElementById("my-id").innerHTML = data;
 			}
-			document.getElementById("my-id").innerHTML = data;
-		}
-	})
+		})
+	}
+
+	updatePeers();
+	updateMessages();
+	getID();
+	setInterval(function(){
+		updateMessages();
+		updatePeers();
+	},1000);
 
 });

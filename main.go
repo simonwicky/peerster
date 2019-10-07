@@ -2,6 +2,7 @@ package main
 
 import ("flag"
 		"github.com/simonwicky/Peerster/gossiper"
+		"fmt"
 )
 
 
@@ -15,6 +16,10 @@ func main() {
 	flag.Parse()
 	 
 	gossiper := gossiper.NewGossiper("127.0.0.1:" + *udpPort, *gossipAddr, *name, *peers)
+	if gossiper == nil {
+		fmt.Println("Problem initializing gossiper")
+		return
+	}
 	gossiper.Start(*simple)
 }
 

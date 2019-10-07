@@ -93,7 +93,7 @@ func (g *Gossiper) antiEntropy(){
 		g.currentStatus_lock.RLock()
 		g.sendToRandomPeer(&utils.GossipPacket{Status : &g.currentStatus})
 		g.currentStatus_lock.RUnlock()
-		fmt.Println("Sending antientropy")
+		fmt.Fprintln(os.Stderr,"Sending antientropy")
 	}
 }
 
@@ -103,7 +103,7 @@ func (g *Gossiper) antiEntropy(){
 
 
 func (g *Gossiper) addToKnownPeers(address string) bool {
-	fmt.Printf("Adding peer %s to known peers\n", address)
+	fmt.Fprintf(os.Stderr,"Adding peer %s to known peers\n", address)
 	for _, peer := range g.knownPeers {
 		if peer == address {
 			return false
@@ -127,7 +127,7 @@ func (g *Gossiper) sendToRandomPeer(packet *utils.GossipPacket) string{
 		g.sendToPeer(nextPeerAddr, packet)
 		return nextPeerAddr
 	} else {
-		fmt.Println("No known peers")
+		fmt.Fprintln(os.Stderr,"No known peers")
 		return ""
 	}
 }
@@ -141,15 +141,15 @@ func (g *Gossiper) sendToPeer(peer string, packet *utils.GossipPacket){
 		}
 		packetBytes, err := protobuf.Encode(packet)
 		if err != nil {
-			fmt.Println("Could not serialize packet")
+			fmt.Fprintln(os.Stderr,"Could not serialize packet")
 			return
 		}
 		n,_ := g.connPeer.WriteToUDP(packetBytes,address)
-		fmt.Println("Packet sent to " + address.String() + " size: ",n)
+		fmt.Fprintln(os.Stderr,"Packet sent to " + address.String() + " size: ",n)
 }
 
 func (g *Gossiper) updateStatus(status utils.PeerStatus, index int){
-	fmt.Println("Status update")
+	fmt.Fprintln(os.Stderr,"Status update")
 	g.currentStatus_lock.Lock()
 	if index == -1 {
 		g.currentStatus.Want = append(g.currentStatus.Want, status)
@@ -171,17 +171,20 @@ func (g *Gossiper) addMessage(rumor *utils.RumorMessage){
 
 //loop handling the peer side
 func (g *Gossiper) PeersHandle(simple bool){
-		fmt.Println("Listening on " + g.addressPeer.String())
+		fmt.Fprintln(os.Stderr,"Listening on " + g.addressPeer.String())
 		var packetBytes []byte = make([]byte, 1024)	
 		for {
 			var packet utils.GossipPacket
 			n,address,err := g.connPeer.ReadFromUDP(packetBytes)
 			if err != nil {
-				fmt.Println("Error!")
+				fmt.Fprintln(os.Stderr,"Error!")
 				return
 			}
 			if n > 0 {
-				protobuf.Decode(packetBytes, &packet)
+				err = protobuf.Decode(packetBytes[:n], &packet)
+				if err != nil {
+					fmt.Fprintln(os.Stderr,err.Error())
+				}
 				if simple {
 					g.peersSimpleMessageHandler(&packet)
 				} else {
