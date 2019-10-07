@@ -71,8 +71,7 @@ func (r *Rumormonger) rumorHandler(packet *utils.GossipPacket) {
 	utils.LogPeers(r.G.knownPeers)
 
 	if newGossiper || r.missingPeer(packet.Rumor.Origin,r.G.currentStatus.Want){
-		//check for races
-		r.G.updateStatus(utils.PeerStatus{Identifer : packet.Rumor.Origin, NextID : packet.Rumor.ID + 1}, -1)
+		r.G.updateStatus(utils.PeerStatus{Identifer : packet.Rumor.Origin, NextID : 1}, -1)
 		r.G.addMessage(packet.Rumor)
 	} else {
 

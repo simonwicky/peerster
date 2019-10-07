@@ -74,14 +74,14 @@ func NewGossiper(clientAddress, address, name, peers string) *Gossiper {
 		workers : make(map[string]*Rumormonger),
 		ticker : time.NewTicker(time.Second * 10),
 		uiBuffer : make(chan utils.GossipPacket, 10),
-		latestRumors : utils.NewRumorKeyQueue(20),
+		latestRumors : utils.NewRumorKeyQueue(50),
 	}
 }
 
 func (g *Gossiper) Start(simple bool){
 	go g.ClientHandle(simple)
 	if !simple {
-		//go g.antiEntropy()
+		go g.antiEntropy()
 	}
 	go g.HttpServerHandler()
 	g.PeersHandle(simple) 
@@ -103,7 +103,7 @@ func (g *Gossiper) antiEntropy(){
 
 
 func (g *Gossiper) addToKnownPeers(address string) bool {
-	fmt.Printf("Adding peer %s to known peers", address)
+	fmt.Printf("Adding peer %s to known peers\n", address)
 	for _, peer := range g.knownPeers {
 		if peer == address {
 			return false
