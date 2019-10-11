@@ -3,6 +3,7 @@ package gossiper
 import ("fmt"
 		"github.com/dedis/protobuf"
 		"github.com/simonwicky/Peerster/utils"
+		"os"
 )
 
 //================================================================
@@ -11,24 +12,23 @@ import ("fmt"
 
 //loop handling the client side
 func (g *Gossiper) ClientHandle(simple bool){
-		fmt.Println("Listening on " + g.addressClient.String())
+		fmt.Fprintln(os.Stderr,"Listening on " + g.addressClient.String())
 		var packetBytes []byte = make([]byte, 1024)	
 		for {
-			var packet utils.GossipPacket
+			var packet utils.Message
 			n,_,err := g.connClient.ReadFromUDP(packetBytes)
 			if err != nil {
-				fmt.Println("Error!")
+				fmt.Fprintln(os.Stderr,"Error!")
 				return
 			}
 
 			if n > 0 {
-				protobuf.Decode(packetBytes, &packet)
+				protobuf.Decode(packetBytes[:n], &packet)
 				switch {
 					case simple:
 						g.clientSimpleMessageHandler(&packet)
-					case packet.Rumor != nil :
+					default:
 						g.clientRumorHandler(&packet)
-					//case packet.Status != nil :
 				}
 
 			}		
@@ -36,31 +36,35 @@ func (g *Gossiper) ClientHandle(simple bool){
 		}
 }
 
-func (g *Gossiper) clientSimpleMessageHandler(packet *utils.GossipPacket) {
-	fmt.Println("CLIENT MESSAGE " + packet.Simple.Contents)
+func (g *Gossiper) clientSimpleMessageHandler(packet *utils.Message) {
+	fmt.Println("CLIENT MESSAGE " + packet.Text)
 
-	packet.Simple.OriginalName = g.Name
-	packet.Simple.RelayPeerAddr = g.addressPeer.String()
+	var simple utils.SimpleMessage
+	simple.OriginalName = g.Name
+	simple.RelayPeerAddr = g.addressPeer.String()
+	simple.Contents = packet.Text
 	//sending to known peers
-	g.sendToKnowPeers("", packet)
+	g.sendToKnowPeers("", &utils.GossipPacket{Simple: &simple})
 }
 
-func (g *Gossiper) clientRumorHandler(packet *utils.GossipPacket) {
-	fmt.Println("CLIENT MESSAGE " + packet.Rumor.Text)
-	packet.Rumor.Origin = g.Name
-	packet.Rumor.ID = g.counter
+func (g *Gossiper) clientRumorHandler(packet *utils.Message) {
+	fmt.Println("CLIENT MESSAGE " + packet.Text)
+	var rumor utils.RumorMessage
+	rumor.Origin = g.Name
+	rumor.ID = g.counter
+	rumor.Text = packet.Text
 	statusIndex := -1
 	for index,status := range g.currentStatus.Want {
-		if status.Identifer == packet.Rumor.Origin{
+		if status.Identifer == rumor.Origin{
 			statusIndex = index
 		}
 	}
-	g.updateStatus(utils.PeerStatus{Identifer : packet.Rumor.Origin, NextID : packet.Rumor.ID + 1}, statusIndex)
+	g.updateStatus(utils.PeerStatus{Identifer : rumor.Origin, NextID : rumor.ID + 1}, statusIndex)
 	g.counter_lock.Lock()
 	g.counter += 1
 	g.counter_lock.Unlock()
-	g.sendToRandomPeer(packet)
+	g.sendToRandomPeer(&utils.GossipPacket{Rumor : &rumor})
 	//add the message to storage
-	g.addMessage(packet.Rumor)
+	g.addMessage(&rumor)
 
 }

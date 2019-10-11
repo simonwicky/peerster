@@ -9,6 +9,7 @@ import ("net"
 		"math/rand"
 		"time"
 		"sync"
+		"strconv"
 )
 
 
@@ -32,35 +33,41 @@ type Gossiper struct {
 }
 
 
-func NewGossiper(clientAddress, address, name, peers string) *Gossiper {
+func NewGossiper(clientAddress, address, name, peers string, antiEntropy int) *Gossiper {
 	rand.Seed(time.Now().Unix())
 	udpAddrPeer, err := net.ResolveUDPAddr("udp4", address)
 	if err != nil {
-		fmt.Println("Unable to resolve UDP address")
+		fmt.Fprintln(os.Stderr,"Unable to resolve UDP address")
 		return nil
 	}
 
 	udpConnPeer, err := net.ListenUDP("udp4",udpAddrPeer)
 	if err != nil {
-		fmt.Println("Unable to listen")
+		fmt.Fprintln(os.Stderr,"Unable to listen")
 		return nil
 	}
 
 	udpAddrClient, err := net.ResolveUDPAddr("udp4", clientAddress)
 	if err != nil {
-		fmt.Println("Unable to resolve UDP address")
+		fmt.Fprintln(os.Stderr,"Unable to resolve UDP address")
 		return nil
 	}
 
 	udpConnClient, err := net.ListenUDP("udp4",udpAddrClient)
 	if err != nil {
-		fmt.Println("Unable to listen")
+		fmt.Fprintln(os.Stderr,"Unable to listen")
 		return nil
 	}
 	var peersArray []string
 	if peers != ""{
 		peersArray = strings.Split(peers, ",")
 	}
+
+	if antiEntropy <= 0 || antiEntropy > 100 {
+		fmt.Fprintln(os.Stderr,"Anti Entropy too small or too high, fallback to 10")
+		antiEntropy = 10
+	}
+	antiEntropy_duration, _ := time.ParseDuration(strconv.Itoa(antiEntropy) + "s")
 
 	return &Gossiper{
 		addressPeer: udpAddrPeer,
@@ -72,7 +79,7 @@ func NewGossiper(clientAddress, address, name, peers string) *Gossiper {
 		counter: 1,
 		messages : make(map[utils.RumorMessageKey]utils.RumorMessage,10),
 		workers : make(map[string]*Rumormonger),
-		ticker : time.NewTicker(time.Second * 10),
+		ticker : time.NewTicker(antiEntropy_duration),
 		uiBuffer : make(chan utils.GossipPacket, 10),
 		latestRumors : utils.NewRumorKeyQueue(50),
 	}
@@ -83,7 +90,7 @@ func (g *Gossiper) Start(simple bool){
 	if !simple {
 		go g.antiEntropy()
 	}
-	go g.HttpServerHandler()
+	//go g.HttpServerHandler()
 	g.PeersHandle(simple) 
 }
 

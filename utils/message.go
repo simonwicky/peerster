@@ -1,5 +1,9 @@
 package utils
 
+type Message struct {
+	Text string
+}
+
 type SimpleMessage struct {
 	OriginalName string
 	RelayPeerAddr string

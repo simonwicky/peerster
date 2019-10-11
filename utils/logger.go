@@ -4,7 +4,7 @@ import ("fmt"
 		"strings")
 
 func LogRumor(packet *RumorMessage, address string){
-	fmt.Printf("RUMOR MESSAGE origin %s from %s ID %d contents %s\n",packet.Origin,address,packet.ID,packet.Text)
+	fmt.Printf("RUMOR origin %s from %s ID %d contents %s\n",packet.Origin,address,packet.ID,packet.Text)
 }
 
 func LogStatus(want []PeerStatus, address string){
@@ -20,7 +20,7 @@ func LogSimpleMessage(packet *SimpleMessage){
 }
 
 func LogPeers(peers []string){
-	fmt.Println( "PEERS " + strings.Join(peers,","))
+	fmt.Println("PEERS " + strings.Join(peers,","))
 }
 
 func LogSync(address string){
