@@ -20,7 +20,7 @@ func LogSimpleMessage(packet *SimpleMessage){
 }
 
 func LogPeers(peers []string){
-	fmt.Println("PEERS " + strings.Join(peers,","))
+	fmt.Printf("PEERS %s\n", strings.Join(peers,","))
 }
 
 func LogSync(address string){
@@ -33,4 +33,16 @@ func LogFlip(address string){
 
 func LogMongering(address string){
 	fmt.Printf("MONGERING with %s\n",address)
+}
+
+func LogDSDV(name, address string){
+	fmt.Printf("DSDV %s %s\n",name,address)
+}
+
+func LogPrivate(packet *PrivateMessage){
+	fmt.Printf("PRIVATE origin %s hop-limit %d contents %s\n",packet.Origin,packet.HopLimit,packet.Text)
+}
+
+func LogClient(text string){
+	fmt.Printf("CLIENT MESSAGE %s\n",text)
 }

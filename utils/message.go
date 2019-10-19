@@ -2,6 +2,9 @@ package utils
 
 type Message struct {
 	Text string
+	Destination string
+	File *string
+	Request *[]byte
 }
 
 type SimpleMessage struct {
@@ -14,6 +17,14 @@ type RumorMessage struct {
 	Origin string
 	ID	uint32
 	Text string
+}
+
+type PrivateMessage struct {
+	Origin string
+	ID	uint32
+	Text string
+	Destination string
+	HopLimit uint32
 }
 type RumorMessageKey struct {
 	Origin string
@@ -35,6 +46,7 @@ type GossipPacket struct {
 	Simple *SimpleMessage
 	Rumor *RumorMessage
 	Status *StatusPacket
+	Private *PrivateMessage
 }
 
 func CopyGossipPacket(packet *GossipPacket) *GossipPacket {

@@ -15,7 +15,7 @@ func (g *Gossiper) ClientHandle(simple bool){
 		fmt.Fprintln(os.Stderr,"Listening on " + g.addressClient.String())
 		var packetBytes []byte = make([]byte, 1024)	
 		for {
-			var packet utils.Message
+			var message utils.Message
 			n,_,err := g.connClient.ReadFromUDP(packetBytes)
 			if err != nil {
 				fmt.Fprintln(os.Stderr,"Error!")
@@ -23,12 +23,14 @@ func (g *Gossiper) ClientHandle(simple bool){
 			}
 
 			if n > 0 {
-				protobuf.Decode(packetBytes[:n], &packet)
+				protobuf.Decode(packetBytes[:n], &message)
 				switch {
 					case simple:
-						g.clientSimpleMessageHandler(&packet)
+						g.clientSimpleMessageHandler(&message)
+					case message.Destination != "":
+						g.clientPrivateMessageHandler(&message)
 					default:
-						g.clientRumorHandler(&packet)
+						g.clientRumorHandler(&message)
 				}
 
 			}		
@@ -36,35 +38,37 @@ func (g *Gossiper) ClientHandle(simple bool){
 		}
 }
 
-func (g *Gossiper) clientSimpleMessageHandler(packet *utils.Message) {
-	fmt.Println("CLIENT MESSAGE " + packet.Text)
+func (g *Gossiper) clientSimpleMessageHandler(message *utils.Message) {
+	utils.LogClient(message.Text)
 
 	var simple utils.SimpleMessage
 	simple.OriginalName = g.Name
 	simple.RelayPeerAddr = g.addressPeer.String()
-	simple.Contents = packet.Text
+	simple.Contents = message.Text
 	//sending to known peers
 	g.sendToKnowPeers("", &utils.GossipPacket{Simple: &simple})
 }
 
-func (g *Gossiper) clientRumorHandler(packet *utils.Message) {
-	fmt.Println("CLIENT MESSAGE " + packet.Text)
-	var rumor utils.RumorMessage
-	rumor.Origin = g.Name
-	rumor.ID = g.counter
-	rumor.Text = packet.Text
-	statusIndex := -1
-	for index,status := range g.currentStatus.Want {
-		if status.Identifer == rumor.Origin{
-			statusIndex = index
-		}
-	}
-	g.updateStatus(utils.PeerStatus{Identifer : rumor.Origin, NextID : rumor.ID + 1}, statusIndex)
-	g.counter_lock.Lock()
-	g.counter += 1
-	g.counter_lock.Unlock()
+func (g *Gossiper) clientRumorHandler(message *utils.Message) {
+	utils.LogClient(message.Text)
+	rumor := g.generateRumor(message.Text)
 	g.sendToRandomPeer(&utils.GossipPacket{Rumor : &rumor})
-	//add the message to storage
-	g.addMessage(&rumor)
 
+}
+
+func (g *Gossiper) clientPrivateMessageHandler(message *utils.Message){
+	pm := utils.PrivateMessage{
+		Origin: g.Name,
+		ID: 0,
+		Text : message.Text,
+		Destination: message.Destination,
+		HopLimit: 10,
+	}
+	address := g.lookupDSDV(message.Destination)
+	if address == "" {
+		fmt.Fprintln(os.Stderr,"Next hop not found, aborting")
+		return
+	}
+
+	g.sendToPeer(address, &utils.GossipPacket{Private: &pm})
 }

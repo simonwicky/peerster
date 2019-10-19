@@ -43,6 +43,52 @@ $(document).ready(function(){
 		});
 	}
 
+	function updateNodes(){
+		$.ajax({
+			type: "GET",
+			url:"/identifier",
+			datatype: "string",
+			success: function(data,status){
+				var list = data.split(",");
+				var select = document.createElement("select");
+				select.id = "id-list";
+				select.size = list.length;
+				for(var i = 0; i < list.length; i++){
+					var option = document.createElement("option");
+					option.innerHTML = list[i];
+					option.value = list[i];
+					select.appendChild(option);
+				}
+				var idBox = document.getElementById("id-box");
+				idBox.innerHTML = "";
+				idBox.appendChild(select);
+			}
+		});
+	}
+
+	$("#send_mp").click(function(){
+		var text = $("#mp").val();
+		document.getElementById("mp").value = "";
+		var select = document.getElementById("id-list");
+		var identifier = select.options[select.selectedIndex].value;
+		var mp = {
+				Origin:"",
+				ID:0,
+				Text:text,
+				Destination: identifier,
+				HopLimit:0,
+		};
+		$.ajax({
+			type: "POST",
+			url:"/identifier",
+			data:JSON.stringify(mp),
+		});
+	});
+
+	$("#refresh-identifier").click(function(){
+		updateNodes()
+	});
+
 	$("#send").click(function(){
 		var text = $("#message").val();
 		document.getElementById("message").value = "";
@@ -93,6 +139,7 @@ $(document).ready(function(){
 	updatePeers();
 	updateMessages();
 	getID();
+	updateNodes();
 	setInterval(function(){
 		updateMessages();
 		updatePeers();

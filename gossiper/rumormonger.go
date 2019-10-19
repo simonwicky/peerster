@@ -18,48 +18,57 @@ type Rumormonger struct {
 }
 
 
-func NewRumormonger(gossiper *Gossiper, address string, buffer chan utils.GossipPacket) *Rumormonger {
-	return &Rumormonger{
+func NewRumormonger(gossiper *Gossiper, address string, buffer chan utils.GossipPacket, waitingForAck bool, currentRumor *utils.GossipPacket) *Rumormonger {
+	rumormonger := &Rumormonger{
 		G: gossiper, 
 		address: address, 
 		Buffer: buffer,
 		synced: false,
-		waitingForAck: false,
+		waitingForAck: waitingForAck,
+		currentRumor: currentRumor,
 	}
+	if waitingForAck {
+		rumormonger.timer = time.NewTimer(10 * time.Second)
+	}
+	return rumormonger
 }
 
 func (r *Rumormonger) Start() {
 	fmt.Fprintf(os.Stderr,"STARTING talking with %s\n", r.address)
 	for {
+		if r.synced && !r.waitingForAck {
+			return
+		}
 		select {
-		case packet := <- r.Buffer :
-			switch {
-				case packet.Rumor != nil :
-					r.rumorHandler(&packet)
-				case packet.Status != nil :
-					r.statusHandler(&packet)
-					if r.waitingForAck {
-						r.waitingForAck = false
-						r.flipCoin(&packet)
+			case packet := <- r.Buffer :
+				switch {
+					case packet.Rumor != nil :
+						r.rumorHandler(&packet)
+					case packet.Status != nil :
+						r.statusHandler(&packet)
+						if r.waitingForAck {
+							r.waitingForAck = false
+							r.flipCoin(&packet)
+						}
+				}
+			default:
+				if r.waitingForAck {
+					if r.timer == nil {
+						fmt.Fprintln(os.Stderr,"WHY THE FUCK")
 					}
-			}
-		default:
-			if r.synced {
-				return
-			} else {
-				if r.waitingForAck{
 					select {
+
 						case _ = <- r.timer.C :
 							r.timer.Stop()
-							r.G.sendToRandomPeer(r.currentRumor)
+							nextPeerAddr := r.G.sendToRandomPeer(r.currentRumor)
+							fmt.Fprintln(os.Stderr,"Timed out, sending to " + nextPeerAddr)
+							r.G.createAndRunWorker(nextPeerAddr, true, r.currentRumor, nil)
 							return
 						default:  
 							time.Sleep(500 * time.Millisecond)
 					}
-				} else {
-					return
 				}	
-			}
+				
 		}
 
 	}
@@ -71,9 +80,15 @@ func (r *Rumormonger) rumorHandler(packet *utils.GossipPacket) {
 	newMessage := false
 	utils.LogPeers(r.G.knownPeers)
 
+	//check if new peer, or new origin
 	if newGossiper || r.missingPeer(packet.Rumor.Origin,r.G.currentStatus.Want){
-		r.G.updateStatus(utils.PeerStatus{Identifer : packet.Rumor.Origin, NextID : 1}, -1)
-		r.G.addMessage(packet.Rumor)
+		nextID := packet.Rumor.ID + 1
+		//if the message we get is out of order, we need all of them, starting from 1
+		if packet.Rumor.ID != 1 {
+			nextID = 1
+		}
+		r.G.updateStatus(utils.PeerStatus{Identifer : packet.Rumor.Origin, NextID : nextID}, -1)
+		newMessage = true;
 	} else {
 
 		//check if new message from known gossiper
@@ -81,7 +96,6 @@ func (r *Rumormonger) rumorHandler(packet *utils.GossipPacket) {
 			if packet.Rumor.Origin == status.Identifer && packet.Rumor.ID == status.NextID{
 				//update status
 				r.G.updateStatus(utils.PeerStatus{Identifer : packet.Rumor.Origin, NextID : r.G.currentStatus.Want[index].NextID + 1}, index)
-				r.G.addMessage(packet.Rumor)
 				newMessage = true
 			}
 		}
@@ -92,12 +106,17 @@ func (r *Rumormonger) rumorHandler(packet *utils.GossipPacket) {
 	r.G.currentStatus_lock.RUnlock()
 	r.G.sendToPeer(r.address, &ack)
 
-	if newMessage || newGossiper {
+	if newMessage {
 		nextPeerAddr := r.G.sendToRandomPeer(packet)
 		utils.LogMongering(nextPeerAddr)
 		r.waitingForAck = true
 		r.timer = time.NewTimer(10 * time.Second)
 		r.currentRumor = packet
+		r.G.updateDSDV(packet.Rumor.Origin, r.address)
+		if packet.Rumor.Text != "" {
+			r.G.addMessage(packet.Rumor)
+			utils.LogDSDV(packet.Rumor.Origin, r.address)
+		}
 	}
 }
 
@@ -120,8 +139,7 @@ func (r *Rumormonger) checkVectorClock(status *utils.StatusPacket) *utils.Gossip
 	for _, localStatus := range r.G.currentStatus.Want {
 		if r.missingPeer(localStatus.Identifer,status.Want){
 			//other node doesn't know peer from local status
-			key := utils.RumorMessageKey{Origin: localStatus.Identifer, ID: 1}
-			msg := r.G.messages[key]
+			msg := r.G.getMessage(localStatus.Identifer, 1)
 			return &utils.GossipPacket{Rumor : &msg}
 		}
 		for _,extStatus := range status.Want {
@@ -132,8 +150,7 @@ func (r *Rumormonger) checkVectorClock(status *utils.StatusPacket) *utils.Gossip
 					return &status
 				}
 				if localStatus.NextID > extStatus.NextID {
-					key := utils.RumorMessageKey{Origin: extStatus.Identifer, ID: extStatus.NextID}
-					msg := r.G.messages[key]
+					msg := r.G.getMessage(extStatus.Identifer, extStatus.NextID)
 					return &utils.GossipPacket{Rumor : &msg}
 				}	
 			}
@@ -167,6 +184,11 @@ func (r *Rumormonger) flipCoin(packet *utils.GossipPacket) {
 	coinFlip := rand.Int() % 2 == 0
 	if coinFlip {
 		nextPeerAddr := r.G.sendToRandomPeer(packet)
+		r.G.createAndRunWorker(nextPeerAddr, true, packet, nil)
 		utils.LogFlip(nextPeerAddr)
 	}
+}
+
+func (r *Rumormonger) setCurrentRumor(packet *utils.GossipPacket) {
+	r.currentRumor = packet
 }

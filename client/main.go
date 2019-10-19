@@ -10,10 +10,11 @@ import ("flag"
 
 func main() {
 	var uiPort = flag.String("UIPort", "8080", "port for the UI client")
-	var msg = flag.String("msg", "", "message to be sent")
+	var destination = flag.String("dest", "", "destination for the private message; can be omitted")
+	var msg = flag.String("msg", "", "message to be sent; if the -dest flag is present, this is a private message, otherwise it's a rumor message")
 	flag.Parse()
 
-	message := utils.Message{Text : *msg}
+	message := utils.Message{Text : *msg, Destination: *destination}
 	//no tag simple here, so we send simple + rumor
 	packetToSend := &message
 	send(packetToSend, "127.0.0.1:" + *uiPort)

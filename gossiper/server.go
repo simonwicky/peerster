@@ -15,9 +15,10 @@ func (g *Gossiper) HttpServerHandler() {
 	r := mux.NewRouter()
 	r.HandleFunc("/message", g.messageHandler).Methods("POST","GET")
 	r.HandleFunc("/node", g.nodeHandler).Methods("POST","GET")
-	r.HandleFunc("/id", g.idHandler).Methods("GET")	
+	r.HandleFunc("/id", g.idHandler).Methods("GET")
+	r.HandleFunc("/identifier", g.identifierHandler).Methods("GET", "POST")		
 	r.PathPrefix("/").Handler(http.StripPrefix("/", http.FileServer(http.Dir("webclient"))))
-	log.Fatal(http.ListenAndServe(":8080",r))
+	http.ListenAndServe(":8080",r)
 }
 
 func (g *Gossiper) messageHandler(w http.ResponseWriter, r *http.Request){
@@ -52,6 +53,23 @@ func (g *Gossiper) nodeHandler(w http.ResponseWriter, r *http.Request){
 		fmt.Fprintf(w,g.getKnownPeers()) 
 	}
 
+}
+
+func (g *Gossiper) identifierHandler(w http.ResponseWriter, r *http.Request){
+	switch r.Method {
+	case "GET":
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintf(w,g.getIdentifiers()) 
+	case "POST":
+		w.WriteHeader(http.StatusOK)
+		var mp utils.PrivateMessage
+		body, _ := ioutil.ReadAll(r.Body)
+		json.Unmarshal(body, &mp)
+		if mp.Text != "" {
+			fmt.Println(mp.Text)
+			go g.uiPrivateMessageHandler(&utils.GossipPacket{Private :&mp})
+		}
+	}
 }
 
 func (g *Gossiper) idHandler(w http.ResponseWriter, r *http.Request){
