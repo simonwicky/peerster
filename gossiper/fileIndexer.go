@@ -13,6 +13,7 @@ type FileData struct {
 	name string
 	size int64
 	metafile []string
+	data []byte
 	sha string
 }
 
@@ -57,6 +58,7 @@ func (fs *FileStorage) addFromSystem(name string){
 			fmt.Fprintln(os.Stderr,err)
 			return
 		}
+		fileMetaData.data = append(fileMetaData.data,buffer...)
 		currentChecksum := sha256.Sum256(buffer[:n])
 		//converting [32]byte to []byte
 		bytes := currentChecksum[:]
@@ -66,45 +68,89 @@ func (fs *FileStorage) addFromSystem(name string){
 
 	metafileChecksum := sha256.Sum256(metafileBytes)
 	fileMetaData.sha = hex.EncodeToString(metafileChecksum[:])
-
+	fs.lock.Lock()
 	fs.data[fileMetaData.sha] = &fileMetaData
 	fmt.Fprintln(os.Stderr,"Indexed file: " + fs.data[fileMetaData.sha].name)
 	fmt.Fprintln(os.Stderr,"Id file: " + string(fileMetaData.sha))
+	fs.lock.Unlock()
 }
 
 
-func (fs *FileStorage) addFromDatadownloader(dd *Datadownloader){
+
+func (fs *FileStorage) createFile(filename, id string){
 	fd := FileData{
-		name: dd.fileName,
-		size: int64(len(dd.data)),
-		sha : dd.id,
+		name: filename,
+		size: int64(0),
+		sha : id,
 		metafile: make([]string,0),
-	}
-	for offset := 0; offset < len(dd.metafile) / 32 ; offset += 1 {
-		chunkID_bytes := dd.metafile[offset * 32 : (offset + 1) * 32]
-		fd.metafile = append(fd.metafile, hex.EncodeToString(chunkID_bytes))
+		data : make([]byte,0),
 	}
 	fs.lock.Lock()
 	fs.data[fd.sha] = &fd
-	fs.lock.Unlock()
 	fmt.Fprintln(os.Stderr,"Indexed file: " + fs.data[fd.sha].name)
 	fmt.Fprintln(os.Stderr,"Id file: " + string(fd.sha))
+	fs.lock.Unlock()
+}
 
+func (fs *FileStorage) addChunk(chunk []byte, id string) {
+	fs.lock.Lock()
+	defer fs.lock.Unlock()
+	fd := fs.data[id]
+	fd.data = append(fd.data,chunk...)
+	fd.size += int64(len(chunk))
+	fd.metafile = append(fd.metafile, hex.EncodeToString(chunk))
+}
+
+func (fs *FileStorage) saveToDisk(id, filename string){
+	fs.lock.RLock()
+	defer fs.lock.RUnlock()
+	fd := fs.data[id]
 	//add to file system
-	file,err := os.Create(DOWNLOAD_FILE_FOLDER + dd.fileName)
+	file,err := os.Create(DOWNLOAD_FILE_FOLDER + filename)
 	defer file.Close()
 	if err != nil{
 		fmt.Fprintln(os.Stderr,"File creation error")
 		fmt.Fprintln(os.Stderr,err)
 		return
 	}
-	_,err = file.Write(dd.data)
+	_,err = file.Write(fd.data)
 	if err != nil {
 		fmt.Fprintln(os.Stderr,"Error writing file")
 		fmt.Fprintln(os.Stderr,err)
 		return
 	}
 	fmt.Fprintln(os.Stderr,"File saved successfully")
+}
+
+func (fs *FileStorage) checkFile(id string) bool{
+	fs.lock.RLock()
+	defer fs.lock.RUnlock()
+	fd := fs.data[id]
+
+		var metafileBytes []byte
+
+	for offset := int64(0); offset < (fd.size / CHUNK_SIZE) + 1 ; offset += 1 {
+		upperbound := (offset + 1) * CHUNK_SIZE
+		if upperbound > fd.size{
+			upperbound = fd.size
+		}
+		currentChecksum := sha256.Sum256(fd.data[offset * CHUNK_SIZE : upperbound])
+		//converting [32]byte to []byte
+		bytes := currentChecksum[:]
+		fmt.Fprintln(os.Stderr,hex.EncodeToString(bytes))
+		metafileBytes = append(metafileBytes,bytes...)
+	}
+
+	metafileChecksum := sha256.Sum256(metafileBytes)
+	sha := hex.EncodeToString(metafileChecksum[:])
+	fmt.Fprintln(os.Stderr,sha)
+	return sha == id
+}
+
+func (fs *FileStorage) deleteFile(id string) {
+	fs.lock.Lock()
+	delete(fs.data,id)
+	fs.lock.Unlock()
 }
 
 func assembleMetaFile(metafile []string) []byte{
@@ -118,27 +164,14 @@ func assembleMetaFile(metafile []string) []byte{
 	return bytes
 }
 
-func (fs *FileStorage) getFile(fileData *FileData) *os.File{
-	file,err := os.Open(SHARED_FILE_FOLDER + fileData.name)
-	if err != nil {
-		fmt.Fprintln(os.Stderr,"File not found")
-		return nil
-	}
-	return file
-}
 
 func (fs *FileStorage) getFileChunk(fileData *FileData, chunk int) []byte{
-	file,err := os.Open(SHARED_FILE_FOLDER + fileData.name)
-	if err != nil {
-		fmt.Fprintln(os.Stderr,"File not found")
-		return nil
+	lowerbound := int64(chunk) * CHUNK_SIZE
+	upperbound := (int64(chunk) + 1) * CHUNK_SIZE
+	if upperbound > fileData.size {
+		upperbound = fileData.size
 	}
-	buffer := make([]byte,CHUNK_SIZE)
-	n,err := file.ReadAt(buffer,int64(chunk) * CHUNK_SIZE)
-	if err != nil && err != io.EOF {
-		fmt.Fprintln(os.Stderr,err)
-		return nil
-	}
-	return buffer[:n]
-
+	buffer := make([]byte,upperbound-lowerbound)
+	copy(buffer, fileData.data[lowerbound:upperbound])
+	return buffer
 }

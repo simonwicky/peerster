@@ -44,20 +44,29 @@ func (dd *Datadownloader) Start(){
 	}
 	dd.metafile = make([]byte,len(metafile.Data))
 	copy(dd.metafile, metafile.Data)
+	dd.g.fileStorage.createFile(dd.fileName, dd.id)
 	//loop through metafile, requestAndReceiveData the chunks
 	for offset := 0; offset < len(dd.metafile) / 32 ; offset += 1 {
 		utils.LogChunk(dd.fileName,dd.destination, offset)
 		chunkID_bytes := dd.metafile[offset * 32 : (offset + 1) * 32]
 		dd.waitingFor = chunkID_bytes
+		fmt.Fprintln(os.Stderr,"Chunk ID: " + hex.EncodeToString(dd.waitingFor))
 		chunk_reply := dd.requestAndReceiveData()
 		if chunk_reply == nil {
 			return
 		}
 		dd.data = append(dd.data, chunk_reply.Data...)
+		dd.g.fileStorage.addChunk(chunk_reply.Data, dd.id)
 	}
-	//save and index the file
-	dd.g.fileStorage.addFromDatadownloader(dd)
-	utils.LogReconstruct(dd.fileName)
+	//save the file
+	if dd.g.fileStorage.checkFile(dd.id) {
+		dd.g.fileStorage.saveToDisk(dd.id, dd.fileName)
+		utils.LogReconstruct(dd.fileName)
+	} else {
+		//corrupted file, deleting
+		dd.g.fileStorage.deleteFile(dd.id)
+		fmt.Fprintln(os.Stderr,"File corrupted, deleting")
+	}
 }
 
 func (dd *Datadownloader) requestAndReceiveData() *utils.DataReply{
@@ -93,8 +102,6 @@ func (dd *Datadownloader) requestAndReceiveData() *utils.DataReply{
 		}
 	}
 }
-
-
 
 //================================
 //Handling data request
