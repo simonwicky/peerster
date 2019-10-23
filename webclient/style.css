@@ -51,4 +51,9 @@
 	height:  100%;
 }
 
+h5 {
+	display: inline-block;
+	margin : 5px;
+}
+
 h3 { margin: 5px;}

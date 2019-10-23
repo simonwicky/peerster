@@ -48,16 +48,15 @@ func (r *Rumormonger) Start() {
 						r.statusHandler(&packet)
 						if r.waitingForAck {
 							r.waitingForAck = false
-							r.flipCoin(&packet)
+							r.flipCoin(r.currentRumor)
 						}
 				}
 			default:
 				if r.waitingForAck {
 					if r.timer == nil {
-						fmt.Fprintln(os.Stderr,"WHY THE FUCK")
+						fmt.Fprintln(os.Stderr,"Timer is nil")
 					}
 					select {
-
 						case _ = <- r.timer.C :
 							r.timer.Stop()
 							nextPeerAddr := r.G.sendToRandomPeer(r.currentRumor)
@@ -105,6 +104,7 @@ func (r *Rumormonger) rumorHandler(packet *utils.GossipPacket) {
 	ack := utils.GossipPacket{Status : &r.G.currentStatus}
 	r.G.currentStatus_lock.RUnlock()
 	r.G.sendToPeer(r.address, &ack)
+	r.waitingForAck = false
 
 	if newMessage {
 		nextPeerAddr := r.G.sendToRandomPeer(packet)

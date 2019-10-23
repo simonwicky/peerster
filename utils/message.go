@@ -2,7 +2,7 @@ package utils
 
 type Message struct {
 	Text string
-	Destination string
+	Destination *string
 	File *string
 	Request *[]byte
 }
@@ -42,11 +42,28 @@ type StatusPacket struct {
 	Want []PeerStatus
 }
 
+type DataRequest struct {
+	Origin string
+	Destination string
+	HopLimit uint32
+	HashValue []byte
+}
+
+type DataReply struct {
+	Origin string
+	Destination string
+	HopLimit uint32
+	HashValue []byte
+	Data []byte
+}
+
 type GossipPacket struct {
 	Simple *SimpleMessage
 	Rumor *RumorMessage
 	Status *StatusPacket
 	Private *PrivateMessage
+	DataRequest *DataRequest
+	DataReply *DataReply
 }
 
 func CopyGossipPacket(packet *GossipPacket) *GossipPacket {

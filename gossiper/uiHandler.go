@@ -2,8 +2,6 @@ package gossiper
 
 import ("github.com/simonwicky/Peerster/utils"
 		"strings"
-		"fmt"
-		"os"
 )
 
 //================================================================
@@ -20,13 +18,18 @@ func (g *Gossiper) uiRumorHandler(packet *utils.GossipPacket) {
 func (g *Gossiper) uiPrivateMessageHandler(packet *utils.GossipPacket) {
 	packet.Private.Origin = g.Name
 	packet.Private.HopLimit = 10
-	address := g.lookupDSDV(packet.Private.Destination)
-	if address == "" {
-		fmt.Fprintln(os.Stderr,"Next hop not found, aborting")
-		return
-	}
 
-	g.sendToPeer(address, packet)
+	g.sendPointToPoint(packet, packet.Private.Destination)
+}
+
+func (g *Gossiper) uiFileIndexHandler(fileName string){
+	g.fileStorage.lock.Lock()
+	g.fileStorage.addFromSystem(fileName)
+	g.fileStorage.lock.Unlock()
+}
+
+func (g *Gossiper) uiFileDownloadHandler(request *utils.DataRequest,fileName string){
+	g.NewDatadownloader(request, fileName)
 }
 
 func (g *Gossiper) uiAddPeer(peer string) {

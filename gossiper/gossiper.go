@@ -10,29 +10,51 @@ import ("net"
 		"time"
 		"sync"
 		"strconv"
+		"encoding/hex"
 )
 
 
 type Gossiper struct {
+	//network
 	addressPeer *net.UDPAddr
 	connPeer *net.UDPConn
 	addressClient *net.UDPAddr
 	connClient *net.UDPConn
+
+	//name + peers
 	Name string
 	knownPeers []string
+
+	//status
 	currentStatus utils.StatusPacket
 	currentStatus_lock sync.RWMutex
+	//Counter
 	counter uint32
 	counter_lock sync.Mutex
-	messages map[utils.RumorMessageKey]utils.RumorMessage
+
+	//timer
 	antiEntropyTicker *time.Ticker
 	rTimerTicker *time.Ticker
+
+	//rumormongers
 	workers map[string] *Rumormonger
 	workers_lock sync.RWMutex
+
+	//datadownloader
+	downloader map[string] *Datadownloader
+	downloader_lock sync.RWMutex
+
+	//DSDV
 	DSDV map[string] string
 	DSDV_lock sync.RWMutex
+
+	//UI
 	uiBuffer chan utils.GossipPacket
 	latestRumors *utils.RumorKeyQueue
+
+	//storage
+	fileStorage *FileStorage
+	messages map[utils.RumorMessageKey]utils.RumorMessage
 
 }
 
@@ -48,6 +70,7 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 	udpConnPeer, err := net.ListenUDP("udp4",udpAddrPeer)
 	if err != nil {
 		fmt.Fprintln(os.Stderr,"Unable to listen")
+		fmt.Fprintln(os.Stderr,err)
 		return nil
 	}
 
@@ -60,6 +83,7 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 	udpConnClient, err := net.ListenUDP("udp4",udpAddrClient)
 	if err != nil {
 		fmt.Fprintln(os.Stderr,"Unable to listen")
+		fmt.Fprintln(os.Stderr,err)
 		return nil
 	}
 	var peersArray []string
@@ -108,9 +132,13 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		rTimerTicker : rTimerTicker,
 		uiBuffer : make(chan utils.GossipPacket, 10),
 		latestRumors : utils.NewRumorKeyQueue(50),
+		fileStorage : NewFileStorage(),
+		downloader : make(map[string]*Datadownloader),
 	}
 }
-
+//================================
+//STARTUP and ROUTINE functions
+//================================
 func (g *Gossiper) Start(simple bool){
 	go g.ClientHandle(simple)
 	if !simple {
@@ -185,8 +213,37 @@ func (g *Gossiper) sendToPeer(peer string, packet *utils.GossipPacket){
 			fmt.Fprintln(os.Stderr,"Could not serialize packet")
 			return
 		}
-		n,_ := g.connPeer.WriteToUDP(packetBytes,address)
+		n,err := g.connPeer.WriteToUDP(packetBytes,address)
+		if n == 0 {
+			fmt.Fprintln(os.Stderr,err)
+		}
 		fmt.Fprintln(os.Stderr,"Packet sent to " + address.String() + " size: ",n)
+}
+
+func (g *Gossiper) sendPointToPoint(packet *utils.GossipPacket, destination string){
+	var hoplimit *uint32
+	switch {
+	case packet.Private != nil:
+		hoplimit = &packet.Private.HopLimit
+	case packet.DataRequest != nil:
+		hoplimit = &packet.DataRequest.HopLimit
+	case packet.DataReply != nil:
+		hoplimit = &packet.DataReply.HopLimit
+	default:
+		fmt.Fprintln(os.Stderr,"Packet which should not be sent point to point, exiting")
+		return
+	}
+	*hoplimit -= 1
+	if *hoplimit <= 0 {
+		fmt.Fprintln(os.Stderr,"No more hop, dropping packet")
+		return
+	}
+	address := g.lookupDSDV(destination)
+	if address == "" {
+		fmt.Fprintln(os.Stderr,"Next hop not found, aborting")
+		return
+	}
+	g.sendToPeer(address, packet)
 }
 
 //================================
@@ -322,6 +379,35 @@ func (g *Gossiper) createAndRunWorker(address string, waitingForAck bool, curren
 		}()
 	}
 }
+//================================
+//Workers
+//================================
+func (g *Gossiper) addDownloader(dd *Datadownloader){
+	g.downloader_lock.Lock()
+	g.downloader[dd.id] = dd
+	g.downloader_lock.Unlock()
+	go func(){
+		dd.Start()
+		g.removeDownloader(dd.id) 
+	}()
+}
+
+func (g *Gossiper) removeDownloader(id string) {
+	g.downloader_lock.Lock()
+	delete(g.downloader, id)
+	g.downloader_lock.Unlock()
+}
+func (g *Gossiper) lookupDownloader(waitingFor []byte) *Datadownloader {
+	g.downloader_lock.RLock()
+	defer g.downloader_lock.RUnlock()
+	for _,downloader := range g.downloader {
+		if hex.EncodeToString(downloader.waitingFor) == hex.EncodeToString(waitingFor) {
+			return downloader
+		}
+	}
+	return nil
+}
+
 //================================
 //NO CATEGORY
 //================================

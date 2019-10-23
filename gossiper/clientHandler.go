@@ -27,10 +27,20 @@ func (g *Gossiper) ClientHandle(simple bool){
 				switch {
 					case simple:
 						g.clientSimpleMessageHandler(&message)
-					case message.Destination != "":
+					case message.Request != nil:
+						//request for a file
+						g.clientFileRequestHandler(&message)
+					case message.File != nil:
+						//indexing a file
+						g.clientFileIndexHandler(&message)
+					case message.Destination != nil && *message.Destination != "":
+						//private message
 						g.clientPrivateMessageHandler(&message)
-					default:
+					case message.Text != "":
+						//rumor message
 						g.clientRumorHandler(&message)
+					default :
+						fmt.Fprintln(os.Stderr,"Type of message unknown, dropping message.")
 				}
 
 			}		
@@ -61,14 +71,25 @@ func (g *Gossiper) clientPrivateMessageHandler(message *utils.Message){
 		Origin: g.Name,
 		ID: 0,
 		Text : message.Text,
-		Destination: message.Destination,
+		Destination: *message.Destination,
 		HopLimit: 10,
 	}
-	address := g.lookupDSDV(message.Destination)
-	if address == "" {
-		fmt.Fprintln(os.Stderr,"Next hop not found, aborting")
-		return
-	}
 
-	g.sendToPeer(address, &utils.GossipPacket{Private: &pm})
+	packet := &utils.GossipPacket{Private: &pm}
+
+	g.sendPointToPoint(packet, pm.Destination)
+}
+
+func (g *Gossiper) clientFileRequestHandler(message *utils.Message) {
+	dr := utils.DataRequest {
+		Origin: g.Name,
+		Destination: *message.Destination,
+		HopLimit: 10,
+		HashValue : *message.Request,
+	}
+	g.NewDatadownloader(&dr, *message.File)
+}
+
+func (g *Gossiper) clientFileIndexHandler(message *utils.Message) {
+	g.fileStorage.addFromSystem(*message.File)
 }

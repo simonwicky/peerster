@@ -47,10 +47,36 @@
 		<ul id="node-list"></ul>
 
 		</div>
-			<h4>Add peer</h4>
-			<input type="text" id="peer-text" placeholder="Address (ip:port)"/>
-			<button id="add-peer" type="button">Add</button>
-			<button id="refresh-peer" type="button">Refresh</button>
+			<div>
+				<h4>Add peer</h4>
+				<input type="text" id="peer-text" placeholder="Address (ip:port)"/>
+				<button id="add-peer" type="button">Add</button>
+				<button id="refresh-peer" type="button">Refresh</button>
+			</div>
+			<div>
+				<h4>Share a file</h4>
+				<input id="file-input" type="file"/>
+				<button id="share-file" type="button">Share this file</button>
+			</div>
+			<div>
+				<h4>Download a file</h4>
+
+				<table>
+				  <tr>
+				    <td><h5>Name:</h5></td>
+				    <td><input type="text" id="dl-name" placeholder="File name"/></td>
+				  </tr>
+				  <tr>
+				    <td><h5>Peer:</h5></td>
+				    <td><input type="text" id="dl-peer" placeholder="Peer"/></td>
+				  </tr>
+				  <tr>
+				    <td><h5>Request ID:</h5></td>
+				    <td><input type="text" id="dl-request" placeholder="Hex string"></td>
+				  </tr>
+				</table>
+				<button id="dl-file" type="button">Download file</button>
+			</div>
 	</div>
 </div>
 </body>

@@ -46,3 +46,15 @@ func LogPrivate(packet *PrivateMessage){
 func LogClient(text string){
 	fmt.Printf("CLIENT MESSAGE %s\n",text)
 }
+
+func LogMetafile(filename, peer string){
+	fmt.Printf("DOWNLOADING metafile of %s from %s\n",filename,peer)
+}
+
+func LogChunk(filename, peer string, index int){
+	fmt.Printf("DOWNLOADING %s chunk %d from %s\n",filename,index,peer)
+}
+
+func LogReconstruct(filename string) {
+	fmt.Printf("RECONSTRUCTED file %s\n",filename)
+}

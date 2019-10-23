@@ -121,6 +121,29 @@ $(document).ready(function(){
 
 	$("#refresh-peer").click(updatePeers());
 
+	$("#share-file").click(function(){
+		var name = document.getElementById("file-input").files[0].name;
+		$.ajax({
+			type: "POST",
+			url:"/file",
+			data:name,
+		});
+	});
+
+	$("#dl-file").click(function(){
+		var name = $("#dl-name").val();
+		document.getElementById("dl-name").value = "";
+		var peer = $("#dl-peer").val();
+		document.getElementById("dl-peer").value = "";
+		var request = $("#dl-request").val();
+		document.getElementById("dl-request").value = "";
+		var parameters = [name, peer, request]
+		$.ajax({
+			type: "POST",
+			url:"/download",
+			data:JSON.stringify(parameters),
+		});
+	});
 	
 	function getID(){
 		$.ajax({
