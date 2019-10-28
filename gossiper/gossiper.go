@@ -1,3 +1,4 @@
+
 package gossiper
 
 import ("net"
@@ -86,6 +87,12 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		fmt.Fprintln(os.Stderr,err)
 		return nil
 	}
+
+	if name == "" {
+		fmt.Fprintln(os.Stderr,"Name must be specified")
+		return nil
+	}
+
 	var peersArray []string
 	if peers != ""{
 		peersArray = strings.Split(peers, ",")
@@ -239,6 +246,9 @@ func (g *Gossiper) sendPointToPoint(packet *utils.GossipPacket, destination stri
 		return
 	}
 	address := g.lookupDSDV(destination)
+	if destination == g.Name{
+		address = g.addressPeer.String()
+	}
 	if address == "" {
 		fmt.Fprintln(os.Stderr,"Next hop not found, aborting")
 		return
@@ -277,10 +287,12 @@ func (g *Gossiper) updateStatus(status utils.PeerStatus, index int){
 //DSDV
 //================================
 func (g *Gossiper) updateDSDV(name,addr string){
-	fmt.Fprintln(os.Stderr,"DSDV update")
-	g.DSDV_lock.Lock()
-	g.DSDV[name] = addr
-	g.DSDV_lock.Unlock()
+	if name != g.Name {
+		fmt.Fprintln(os.Stderr,"DSDV update")
+		g.DSDV_lock.Lock()
+		g.DSDV[name] = addr
+		g.DSDV_lock.Unlock()
+	}
 }
 func (g *Gossiper) lookupDSDV(name string) string {
 	g.DSDV_lock.RLock()

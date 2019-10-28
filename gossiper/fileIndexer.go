@@ -22,7 +22,7 @@ type FileStorage struct {
 	lock sync.RWMutex
 }
 
-var CHUNK_SIZE int64 = 8000
+var CHUNK_SIZE int64 = 8192
 var SHARED_FILE_FOLDER = "_SharedFiles/"
 var DOWNLOAD_FILE_FOLDER = "_Downloads/"
 
@@ -137,13 +137,11 @@ func (fs *FileStorage) checkFile(id string) bool{
 		currentChecksum := sha256.Sum256(fd.data[offset * CHUNK_SIZE : upperbound])
 		//converting [32]byte to []byte
 		bytes := currentChecksum[:]
-		fmt.Fprintln(os.Stderr,hex.EncodeToString(bytes))
 		metafileBytes = append(metafileBytes,bytes...)
 	}
 
 	metafileChecksum := sha256.Sum256(metafileBytes)
 	sha := hex.EncodeToString(metafileChecksum[:])
-	fmt.Fprintln(os.Stderr,sha)
 	return sha == id
 }
 
