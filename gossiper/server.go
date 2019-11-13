@@ -100,7 +100,7 @@ func (g *Gossiper) downloadHandler(w http.ResponseWriter, r *http.Request){
 			fmt.Fprintln(os.Stderr,"Malformed hash")
 			return
 		}
-		if destination == "" || hash == ""{
+		if destination == ""{
 			fmt.Fprintln(os.Stderr,"Incorrect parameters")
 			return
 		}
