@@ -170,14 +170,14 @@ func (g *Gossiper) antiEntropy(){
 }
 
 func (g *Gossiper) rumorRoute() {
+	if g.rTimerTicker == nil {
+		return
+	}
 	for {
 		rumor := g.generateRumor("")
 		g.sendToRandomPeer(&utils.GossipPacket{Rumor : &rumor})
 		fmt.Fprintln(os.Stderr,"Sending route rumors.")
 		//if no timer this is the only route rumors sent
-		if g.rTimerTicker == nil {
-			break
-		}
 		_ = <- g.rTimerTicker.C
 	}
 }

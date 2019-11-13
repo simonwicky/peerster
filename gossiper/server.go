@@ -18,7 +18,7 @@ func (g *Gossiper) HttpServerHandler() {
 	r.HandleFunc("/node", g.nodeHandler).Methods("POST","GET")
 	r.HandleFunc("/file", g.fileHandler).Methods("POST","GET")
 	r.HandleFunc("/id", g.idHandler).Methods("GET")
-	r.HandleFunc("/identifier", g.identifierHandler).Methods("GET", "POST")		
+	r.HandleFunc("/identifier", g.identifierHandler).Methods("GET", "POST")
 	r.HandleFunc("/download", g.downloadHandler).Methods("POST")
 	r.PathPrefix("/").Handler(http.StripPrefix("/", http.FileServer(http.Dir("webclient"))))
 	http.ListenAndServe(":8080",r)
@@ -98,6 +98,10 @@ func (g *Gossiper) downloadHandler(w http.ResponseWriter, r *http.Request){
 		hash, err := hex.DecodeString(parameters[2])
 		if err != nil {
 			fmt.Fprintln(os.Stderr,"Malformed hash")
+			return
+		}
+		if destination == "" || hash == ""{
+			fmt.Fprintln(os.Stderr,"Incorrect parameters")
 			return
 		}
 		dr := utils.DataRequest{

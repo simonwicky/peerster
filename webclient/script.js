@@ -117,7 +117,7 @@ $(document).ready(function(){
 			data:peer,
 		});
 	});
-	
+
 
 	$("#refresh-peer").click(updatePeers());
 
