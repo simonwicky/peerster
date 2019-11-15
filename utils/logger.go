@@ -58,3 +58,18 @@ func LogChunk(filename, peer string, index int){
 func LogReconstruct(filename string) {
 	fmt.Printf("RECONSTRUCTED file %s\n",filename)
 }
+func LogSearchFinished(){
+	fmt.Printf("SEARCH FINISHED\n");
+}
+func LogFileFound(name, peer, metafile string, chunkMap []uint64){
+	fmt.Printf("FOUND match %s at %s\n",name,peer)
+	fmt.Printf("metafile=%s chunks=",metafile)
+	for index,n := range chunkMap {
+		fmt.Printf("%d",n)
+		if index != len(chunkMap)-1 {
+			fmt.Printf(",")
+		}
+	}
+	fmt.Printf("\n")
+
+}

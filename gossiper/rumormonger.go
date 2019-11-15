@@ -20,8 +20,8 @@ type Rumormonger struct {
 
 func NewRumormonger(gossiper *Gossiper, address string, buffer chan utils.GossipPacket, waitingForAck bool, currentRumor *utils.GossipPacket) *Rumormonger {
 	rumormonger := &Rumormonger{
-		G: gossiper, 
-		address: address, 
+		G: gossiper,
+		address: address,
 		Buffer: buffer,
 		synced: false,
 		waitingForAck: waitingForAck,
@@ -63,11 +63,10 @@ func (r *Rumormonger) Start() {
 							fmt.Fprintln(os.Stderr,"Timed out, sending to " + nextPeerAddr)
 							r.G.createAndRunWorker(nextPeerAddr, true, r.currentRumor, nil)
 							return
-						default:  
+						default:
 							time.Sleep(500 * time.Millisecond)
 					}
-				}	
-				
+				}
 		}
 
 	}

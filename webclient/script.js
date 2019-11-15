@@ -117,7 +117,7 @@ $(document).ready(function(){
 			data:peer,
 		});
 	});
-	
+
 
 	$("#refresh-peer").click(updatePeers());
 
@@ -144,7 +144,43 @@ $(document).ready(function(){
 			data:JSON.stringify(parameters),
 		});
 	});
-	
+
+	$("#keywords_button").click(function(){
+		var keywords = $("#keywords").val();
+		var matchBox = document.getElementById("match-box");
+		matchBox.innerHTML = "";
+		$.ajax({
+			type: "POST",
+			url:"/keywords",
+			data:keywords,
+			success:function(data) {
+				var list = data.split(",");
+				var ul = document.createElement("ul");
+				ul.id = "match-list"
+				for(var i = 0; i < list.length; i++){
+					var li = document.createElement("li");
+					li.innerHTML = list[i];
+					li.id = "match" + i;
+					li.addEventListener("dblclick",function(e){
+						download_file(e);
+					});
+					ul.appendChild(li);
+				}
+				var matchBox = document.getElementById("match-box");
+				matchBox.innerHTML = "";
+				matchBox.appendChild(ul);
+			}
+		});
+	});
+
+	function download_file(e){
+		$.ajax({
+			type: "POST",
+			url:"/downloadsearch",
+			data: e.target.id[e.target.id.length-1],
+		});
+	};
+
 	function getID(){
 		$.ajax({
 			type: "GET",
@@ -166,6 +202,7 @@ $(document).ready(function(){
 	setInterval(function(){
 		updateMessages();
 		updatePeers();
+		updateNodes();
 	},1000);
 
 });

@@ -9,19 +9,22 @@ import (
 	"io/ioutil"
 	"encoding/hex"
 	"os"
+	"strconv"
 )
 
-func (g *Gossiper) HttpServerHandler() {
+func (g *Gossiper) HttpServerHandler(port string) {
 	// Simple static webserver:
 	r := mux.NewRouter()
 	r.HandleFunc("/message", g.messageHandler).Methods("POST","GET")
 	r.HandleFunc("/node", g.nodeHandler).Methods("POST","GET")
 	r.HandleFunc("/file", g.fileHandler).Methods("POST","GET")
 	r.HandleFunc("/id", g.idHandler).Methods("GET")
-	r.HandleFunc("/identifier", g.identifierHandler).Methods("GET", "POST")		
+	r.HandleFunc("/identifier", g.identifierHandler).Methods("GET", "POST")
 	r.HandleFunc("/download", g.downloadHandler).Methods("POST")
+	r.HandleFunc("/keywords", g.keywordsHandler).Methods("POST")
+	r.HandleFunc("/downloadsearch",g.downloadSearchedHandler).Methods("POST")
 	r.PathPrefix("/").Handler(http.StripPrefix("/", http.FileServer(http.Dir("webclient"))))
-	http.ListenAndServe(":8080",r)
+	http.ListenAndServe(":"+port,r)
 }
 
 func (g *Gossiper) messageHandler(w http.ResponseWriter, r *http.Request){
@@ -55,7 +58,7 @@ func (g *Gossiper) nodeHandler(w http.ResponseWriter, r *http.Request){
 		go g.uiAddPeer(string(peer))
 	case "GET":
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w,g.getKnownPeers()) 
+		fmt.Fprintf(w,g.getKnownPeers())
 	}
 
 }
@@ -64,7 +67,7 @@ func (g *Gossiper) identifierHandler(w http.ResponseWriter, r *http.Request){
 	switch r.Method {
 	case "GET":
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w,g.getIdentifiers()) 
+		fmt.Fprintf(w,g.getIdentifiers())
 	case "POST":
 		w.WriteHeader(http.StatusOK)
 		var mp utils.PrivateMessage
@@ -100,13 +103,34 @@ func (g *Gossiper) downloadHandler(w http.ResponseWriter, r *http.Request){
 			fmt.Fprintln(os.Stderr,"Malformed hash")
 			return
 		}
-		dr := utils.DataRequest{
-			Origin: g.Name,
-			Destination: destination,
-			HopLimit:10,
-			HashValue: hash,
+		if destination == "" || filename == "" {
+			fmt.Fprintln(os.Stderr,"Incorrect parameters")
+			return
 		}
-		g.NewDatadownloader(&dr, filename)
+		g.uiFileDownloadHandler(hash, destination, filename)
+	}
+}
+
+func (g *Gossiper) downloadSearchedHandler(w http.ResponseWriter, r *http.Request){
+	switch r.Method {
+		case "POST":
+			w.WriteHeader(http.StatusOK)
+			body, _ := ioutil.ReadAll(r.Body)
+			index,_ := strconv.Atoi(string(body))
+			match := g.getFileSearcher().getMatches()[index]
+			fmt.Fprintf(os.Stderr,"Request to download %s\n",match.name)
+			g.uiFileDownloadHandler(match.fileData.metafileHash, "", "")
+	}
+}
+
+func (g *Gossiper) keywordsHandler(w http.ResponseWriter, r *http.Request){
+	switch r.Method {
+		case "POST":
+			w.WriteHeader(http.StatusOK)
+			body, _ := ioutil.ReadAll(r.Body)
+			keywords := string(body)
+			matches := g.uiFileSearchHandler(keywords)
+			fmt.Fprintf(w,matches)
 	}
 }
 

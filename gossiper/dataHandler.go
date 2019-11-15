@@ -28,7 +28,8 @@ func (g *Gossiper) NewDatadownloader(request *utils.DataRequest, fileName string
 	dd.fileName = fileName
 	dd.destination = request.Destination
 	dd.replies = make(chan *utils.DataReply, 20)
-	dd.waitingFor = request.HashValue
+	dd.waitingFor = make([]byte,len(request.HashValue))
+	copy(dd.waitingFor, request.HashValue)
 	dd.id = hex.EncodeToString(request.HashValue)
 	dd.g = g
 	dd.g.addDownloader(dd)
@@ -36,27 +37,50 @@ func (g *Gossiper) NewDatadownloader(request *utils.DataRequest, fileName string
 }
 
 func (dd *Datadownloader) Start(){
+	downloadFrom := dd.destination
 	fmt.Fprintln(os.Stderr,"Starting downloader file id " + dd.id)
-	utils.LogMetafile(dd.fileName, dd.destination)
-	metafile := dd.requestAndReceiveData()
-	if metafile == nil {
+	if dd.destination == "" {
+		fd, ok := dd.g.fileStorage.data[dd.id]
+		if !ok {
+			fmt.Fprintln(os.Stderr,"File not searched, no destination")
+			return
+		}
+		if fd.local {
+			fmt.Fprintln(os.Stderr,"File already downloaded")
+			return
+		}
+		dd.fileName = fd.name
+		downloadFrom = fd.metafileLocation
+	}
+	utils.LogMetafile(dd.fileName, downloadFrom)
+	metafile := dd.requestAndReceiveData(downloadFrom)
+	if metafile == nil || len(metafile.Data) == 0{
+		fmt.Fprintln(os.Stderr,"Empty data field or too much trial")
 		return
 	}
+
 	dd.metafile = make([]byte,len(metafile.Data))
 	copy(dd.metafile, metafile.Data)
-	dd.g.fileStorage.createFile(dd.fileName, dd.id)
+	if dd.destination != "" {
+		dd.g.fileStorage.createFile(dd.fileName, dd.id)
+	}
+
 	//loop through metafile, requestAndReceiveData the chunks
 	for offset := 0; offset < len(dd.metafile) / 32 ; offset += 1 {
-		utils.LogChunk(dd.fileName,dd.destination, offset)
 		chunkID_bytes := dd.metafile[offset * 32 : (offset + 1) * 32]
-		dd.waitingFor = chunkID_bytes
+		copy(dd.waitingFor,chunkID_bytes)
 		fmt.Fprintln(os.Stderr,"Chunk ID: " + hex.EncodeToString(dd.waitingFor))
-		chunk_reply := dd.requestAndReceiveData()
-		if chunk_reply == nil {
+		if dd.destination == "" {
+			downloadFrom = dd.g.fileStorage.data[dd.id].chunkLocation[uint64(offset + 1)]
+		}
+		utils.LogChunk(dd.fileName,downloadFrom, offset + 1)
+		chunk_reply := dd.requestAndReceiveData(downloadFrom)
+		if chunk_reply == nil || len(chunk_reply.Data) == 0 {
+			fmt.Fprintln(os.Stderr,"Empty data field or too much trial")
 			return
 		}
 		dd.data = append(dd.data, chunk_reply.Data...)
-		dd.g.fileStorage.addChunk(chunk_reply.Data, dd.id)
+		dd.g.fileStorage.addChunk(chunk_reply.Data, dd.id, offset + 1)
 	}
 	//save the file
 	if dd.g.fileStorage.checkFile(dd.id) {
@@ -69,10 +93,10 @@ func (dd *Datadownloader) Start(){
 	}
 }
 
-func (dd *Datadownloader) requestAndReceiveData() *utils.DataReply{
+func (dd *Datadownloader) requestAndReceiveData(destination string) *utils.DataReply{
 	dr := &utils.DataRequest{
 		Origin : dd.g.Name,
-		Destination : dd.destination,
+		Destination : destination,
 		HopLimit : 10,
 		HashValue : dd.waitingFor,
 	}
@@ -95,10 +119,9 @@ func (dd *Datadownloader) requestAndReceiveData() *utils.DataReply{
 						}
 						dd.g.sendPointToPoint(&utils.GossipPacket{DataRequest: dr}, dr.Destination)
 						dd.timeout = time.NewTimer(5 * time.Second)
-					default:  
+					default:
 						time.Sleep(250 * time.Millisecond)
-				}	
-				
+				}
 		}
 	}
 }
@@ -131,15 +154,18 @@ func (g *Gossiper) replyData(request *utils.DataRequest){
 			if chunkID == fileID {
 				fmt.Fprintf(os.Stderr,"Found chunk n : %d\n",index)
 				bytes := g.fileStorage.getFileChunk(fileData,index)
-				if bytes == nil {
+				if len(bytes) == 0 {
 					fmt.Fprintln(os.Stderr,"Chunk not found, can not send")
+					//send empty DataReply
 				}
 				g.sendData(bytes, request)
 				return
 			}
 		}
 	}
+
 	fmt.Fprintln(os.Stderr,"Chunk not found, can not send")
+	g.sendData([]byte{},request)
 
 }
 

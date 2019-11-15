@@ -1,10 +1,38 @@
 #column1 {
-	width:30%;
-	float:left;
+	width:45%;
+	display: inline-block;
 	border: 1px solid black;
 	height: 100%;
 	margin: 5px;
 	padding: 5px;
+	vertical-align: top;
+
+}
+#left-block {
+	width:60%;
+	display:  inline-block;
+}
+#column3 {
+	display:  inline-block;
+	width:30%;
+	border: 1px solid green;
+	height: 100%;
+	margin: 5px;
+	padding: 5px;
+	vertical-align: top;
+}
+#column2 {
+	width:45%;
+	display: inline-block;
+	border:1px solid red;
+	height: 100%;
+	margin: 5px;
+	padding: 5px;
+	vertical-align: top;
+}
+
+#content{
+	border:2px solid black;
 }
 
 #chat-box, #id-box {
@@ -15,14 +43,6 @@
 	overflow-y: wrap;
 }
 
-#column2 {
-	width: 30%;
-	float: left;
-	border: 1px solid red;
-	height: 100%;
-	margin: 5px;
-	padding: 5px;
-}
 
 #node-box {
 	margin : 5px;
@@ -31,13 +51,21 @@
 	border : 1px solid blue;
 }
 
-#column3 {
-	width: 30%;
-	float: left;
-	border: 1px solid green;
+
+#bottom_box {
+	width: 90%;
+	border: 1px solid orange;
 	height: 100%;
 	margin: 5px;
 	padding: 5px;
+	clear:left;
+}
+
+.search{
+	vertical-align: top;
+	display:   inline-block;
+	width:30%;
+	border: 1px solid blue;
 }
 
 #identifier{

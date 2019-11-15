@@ -5,6 +5,8 @@ type Message struct {
 	Destination *string
 	File *string
 	Request *[]byte
+	Budget *uint64
+	Keywords *string
 }
 
 type SimpleMessage struct {
@@ -57,6 +59,26 @@ type DataReply struct {
 	Data []byte
 }
 
+type SearchRequest struct {
+	Origin string
+	Budget uint64
+	Keywords []string
+}
+
+type SearchReply struct {
+	Origin string
+	Destination string
+	HopLimit uint32
+	Results []*SearchResult
+}
+
+type SearchResult struct {
+	FileName string
+	MetafileHash []byte
+	ChunkMap []uint64
+	ChunkCount uint64
+}
+
 type GossipPacket struct {
 	Simple *SimpleMessage
 	Rumor *RumorMessage
@@ -64,29 +86,6 @@ type GossipPacket struct {
 	Private *PrivateMessage
 	DataRequest *DataRequest
 	DataReply *DataReply
-}
-
-func CopyGossipPacket(packet *GossipPacket) *GossipPacket {
-	var simple *SimpleMessage
-	if packet.Simple != nil {
-		simple = &(*packet.Simple)
-	} else {
-		simple = nil
-	}
-	var rumor *RumorMessage
-	if packet.Rumor != nil {
-		rumor = &(*packet.Rumor)
-	} else {
-		rumor = nil
-	}
-	var status *StatusPacket
-	if packet.Status != nil {
-		want := make([]PeerStatus,len(packet.Status.Want))
-		copy(want,packet.Status.Want)
-		status = &StatusPacket{Want: want}
-	} else {
-		status = nil
-	}
-	newPacket := &GossipPacket{Simple : simple, Rumor : rumor, Status : status}
-	return newPacket
+	SearchRequest *SearchRequest
+	SearchReply *SearchReply
 }

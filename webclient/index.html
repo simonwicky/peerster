@@ -9,33 +9,49 @@
 <body>
 <div id="content">
 	<h1>Peerster</h1>
-	<div id="column1">
-		<h3>Chat box</h3>
-		<div id="chat-box">
-			<ul id="message-list"></ul>
+	<div id="left-block">
+		<div id="column1">
+			<h3>Chat box</h3>
+			<div id="chat-box">
+				<ul id="message-list"></ul>
+			</div>
+					<h4>Message</h4>
+					<input type="text" id="message" placeholder="Hello World"/>
+					<button id="send" type="button">Send</button>
+					<button id="refresh-message" type="button">Refresh</button>
+
 		</div>
-				<h4>Message</h4>
-				<input type="text" id="message" placeholder="Hello World"/>
-				<button id="send" type="button">Send</button>
-				<button id="refresh-message" type="button">Refresh</button>
+		<div id="column2">
+			<h3> Known nodes</h3>
+			<div id="id-box">
+				<select id="id-list" size = 10>
+					<option value="item1">Item 1
+					<option value="item2">Item 2
+					<option value="item3">Item 3
+				</select>
+			</div>
 
-	</div>
-	<div id="column2">
-		<h3> Known nodes</h3>
-		<div id="id-box">
-			<select id="id-list" size = 10> 
-				<option value="item1">Item 1 
-				<option value="item2">Item 2 
-				<option value="item3">Item 3 
-			</select>
+					<h4>Private Message</h4>
+					<input type="text" id="mp" placeholder="Hello World"/>
+					<button id="send_mp" type="button">Send</button>
+					<button id="refresh-identifier" type="button">Refresh</button>
+
+
 		</div>
-
-				<h4>Private Message</h4>
-				<input type="text" id="mp" placeholder="Hello World"/>
-				<button id="send_mp" type="button">Send</button>
-				<button id="refresh-identifier" type="button">Refresh</button>
-
-
+		<div id ="bottom_box">
+			<div class="search">
+				<h3>Search</h3>
+				<h4>Kewords</h4>
+				<input type="text" id="keywords" placeholder="comma-separated"/>
+					<button id="keywords_button" type="button">Search</button>
+			</div>
+			<div class="search">
+				<h3>Search Result</h3>
+				<div id=match-box>
+					<ul id="match-list"></ul>
+				</div>
+			</div>
+		</div>
 	</div>
 	<div id="column3">
 		<div id="identifier">
@@ -78,6 +94,6 @@
 				<button id="dl-file" type="button">Download file</button>
 			</div>
 	</div>
-</div>
+
 </body>
 </html>

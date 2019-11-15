@@ -4,6 +4,7 @@ import ("fmt"
 		"github.com/dedis/protobuf"
 		"github.com/simonwicky/Peerster/utils"
 		"os"
+		"strings"
 )
 
 //================================================================
@@ -13,7 +14,7 @@ import ("fmt"
 //loop handling the client side
 func (g *Gossiper) ClientHandle(simple bool){
 		fmt.Fprintln(os.Stderr,"Listening on " + g.addressClient.String())
-		var packetBytes []byte = make([]byte, 1024)	
+		var packetBytes []byte = make([]byte, 1024)
 		for {
 			var message utils.Message
 			n,_,err := g.connClient.ReadFromUDP(packetBytes)
@@ -21,7 +22,6 @@ func (g *Gossiper) ClientHandle(simple bool){
 				fmt.Fprintln(os.Stderr,"Error!")
 				return
 			}
-
 			if n > 0 {
 				protobuf.Decode(packetBytes[:n], &message)
 				switch {
@@ -39,11 +39,13 @@ func (g *Gossiper) ClientHandle(simple bool){
 					case message.Text != "":
 						//rumor message
 						g.clientRumorHandler(&message)
+					case message.Keywords != nil && len(*message.Keywords) > 0:
+						g.clientFileSearchHandler(&message)
 					default :
 						fmt.Fprintln(os.Stderr,"Type of message unknown, dropping message.")
 				}
 
-			}		
+			}
 
 		}
 }
@@ -56,7 +58,7 @@ func (g *Gossiper) clientSimpleMessageHandler(message *utils.Message) {
 	simple.RelayPeerAddr = g.addressPeer.String()
 	simple.Contents = message.Text
 	//sending to known peers
-	g.sendToKnowPeers("", &utils.GossipPacket{Simple: &simple})
+	g.sendToKnownPeers("", &utils.GossipPacket{Simple: &simple})
 }
 
 func (g *Gossiper) clientRumorHandler(message *utils.Message) {
@@ -92,4 +94,14 @@ func (g *Gossiper) clientFileRequestHandler(message *utils.Message) {
 
 func (g *Gossiper) clientFileIndexHandler(message *utils.Message) {
 	g.fileStorage.addFromSystem(*message.File)
+}
+
+func(g *Gossiper) clientFileSearchHandler(message *utils.Message) {
+	searcher := g.getFileSearcher()
+	if !searcher.running {
+		keywords := strings.Split(*message.Keywords,",")
+		go searcher.Start(*message.Budget,keywords)
+	} else {
+		fmt.Fprintln(os.Stderr,"File search already running")
+	}
 }

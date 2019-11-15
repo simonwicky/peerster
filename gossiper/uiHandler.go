@@ -26,8 +26,15 @@ func (g *Gossiper) uiFileIndexHandler(fileName string){
 	g.fileStorage.addFromSystem(fileName)
 }
 
-func (g *Gossiper) uiFileDownloadHandler(request *utils.DataRequest,fileName string){
-	g.NewDatadownloader(request, fileName)
+func (g *Gossiper) uiFileDownloadHandler(hash []byte, destination ,fileName string){
+	dr := utils.DataRequest{
+		Origin: g.Name,
+		Destination: destination,
+		HopLimit:10,
+		HashValue: make([]byte,len(hash)),
+	}
+	copy(dr.HashValue,hash)
+	g.NewDatadownloader(&dr, fileName)
 }
 
 func (g *Gossiper) uiAddPeer(peer string) {
@@ -46,6 +53,24 @@ func (g *Gossiper) getKnownPeers() string {
 func(g *Gossiper) getIdentifiers() string {
 	return g.dumpDSDV()
 }
+
+func (g *Gossiper) uiFileSearchHandler(keywords string) string{
+	searcher := g.getFileSearcher()
+	if !searcher.running {
+		keywords := strings.Split(keywords,",")
+		searcher.Start(2,keywords)
+	}
+	matches := searcher.getMatches()
+	if len(matches) == 0 {
+		return ""
+	}
+	var names []string
+	for _,m := range matches {
+		names = append(names,m.name)
+	}
+	return strings.Join(names,",")
+}
+
 
 
 func (g *Gossiper) getLatestRumors() utils.RumorMessages{

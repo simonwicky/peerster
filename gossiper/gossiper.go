@@ -45,6 +45,10 @@ type Gossiper struct {
 	downloader map[string] *Datadownloader
 	downloader_lock sync.RWMutex
 
+	//filereplier
+	searchreplier map[string] []*SearchReplier
+	searchreplier_lock sync.RWMutex
+
 	//DSDV
 	DSDV map[string] string
 	DSDV_lock sync.RWMutex
@@ -57,6 +61,8 @@ type Gossiper struct {
 	fileStorage *FileStorage
 	messages map[utils.RumorMessageKey]utils.RumorMessage
 
+	//search file
+	fileSearcher *FileSearcher
 }
 
 
@@ -141,19 +147,21 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		latestRumors : utils.NewRumorKeyQueue(50),
 		fileStorage : NewFileStorage(),
 		downloader : make(map[string]*Datadownloader),
+		searchreplier : make(map[string][]*SearchReplier),
+		fileSearcher : nil,
 	}
 }
 //================================
 //STARTUP and ROUTINE functions
 //================================
-func (g *Gossiper) Start(simple bool){
+func (g *Gossiper) Start(simple bool, port string){
 	go g.ClientHandle(simple)
 	if !simple {
 		go g.antiEntropy()
 	}
 	go g.rumorRoute()
-	go g.HttpServerHandler()
-	g.PeersHandle(simple) 
+	go g.HttpServerHandler(port)
+	g.PeersHandle(simple)
 }
 
 func (g *Gossiper) antiEntropy(){
@@ -170,14 +178,13 @@ func (g *Gossiper) antiEntropy(){
 }
 
 func (g *Gossiper) rumorRoute() {
+	if g.rTimerTicker == nil {
+		return
+	}
 	for {
 		rumor := g.generateRumor("")
 		g.sendToRandomPeer(&utils.GossipPacket{Rumor : &rumor})
 		fmt.Fprintln(os.Stderr,"Sending route rumors.")
-		//if no timer this is the only route rumors sent
-		if g.rTimerTicker == nil {
-			break
-		}
 		_ = <- g.rTimerTicker.C
 	}
 }
@@ -189,7 +196,7 @@ func (g *Gossiper) rumorRoute() {
 //================================
 //sending functions
 //================================
-func (g *Gossiper) sendToKnowPeers(exception string, packet *utils.GossipPacket){
+func (g *Gossiper) sendToKnownPeers(exception string, packet *utils.GossipPacket){
 	for _,peer := range g.knownPeers {
 		if peer == exception {
 			continue
@@ -236,15 +243,17 @@ func (g *Gossiper) sendPointToPoint(packet *utils.GossipPacket, destination stri
 		hoplimit = &packet.DataRequest.HopLimit
 	case packet.DataReply != nil:
 		hoplimit = &packet.DataReply.HopLimit
+	case packet.SearchReply != nil:
+		hoplimit = &packet.SearchReply.HopLimit
 	default:
 		fmt.Fprintln(os.Stderr,"Packet which should not be sent point to point, exiting")
 		return
 	}
-	*hoplimit -= 1
 	if *hoplimit <= 0 {
 		fmt.Fprintln(os.Stderr,"No more hop, dropping packet")
 		return
 	}
+	*hoplimit -= 1
 	address := g.lookupDSDV(destination)
 	if destination == g.Name{
 		address = g.addressPeer.String()
@@ -328,7 +337,7 @@ func (g *Gossiper) addMessage(rumor *utils.RumorMessage){
 	if _, new := g.messages[key]; !new{
 		g.messages[key] = *rumor
 		if rumor.Text != "" {
-			g.latestRumors.Push(key)		
+			g.latestRumors.Push(key)
 		}
 	}
 }
@@ -392,7 +401,7 @@ func (g *Gossiper) createAndRunWorker(address string, waitingForAck bool, curren
 	}
 }
 //================================
-//Workers
+//Downloader
 //================================
 func (g *Gossiper) addDownloader(dd *Datadownloader){
 	g.downloader_lock.Lock()
@@ -400,7 +409,7 @@ func (g *Gossiper) addDownloader(dd *Datadownloader){
 	g.downloader_lock.Unlock()
 	go func(){
 		dd.Start()
-		g.removeDownloader(dd.id) 
+		g.removeDownloader(dd.id)
 	}()
 }
 
@@ -419,6 +428,51 @@ func (g *Gossiper) lookupDownloader(waitingFor []byte) *Datadownloader {
 	}
 	return nil
 }
+
+//================================
+//SearchReplier
+//================================
+func (g *Gossiper) addSearchReplier(sr *SearchReplier){
+	g.searchreplier_lock.Lock()
+	g.searchreplier[sr.origin] = append(g.searchreplier[sr.origin], sr)
+	g.searchreplier_lock.Unlock()
+}
+
+func (g *Gossiper) lookupSearchRequest(origin string, keywords []string) bool{
+	g.searchreplier_lock.Lock()
+	defer g.searchreplier_lock.Unlock()
+	for _, replier := range g.searchreplier[origin]{
+		if utils.ArrayEquals(replier.keywords, keywords) {
+			return true
+		}
+	}
+	return false
+}
+
+func (g *Gossiper) removeSearchReplier(sr *SearchReplier){
+	g.searchreplier_lock.Lock()
+	defer g.searchreplier_lock.Unlock()
+	for index, replier := range g.searchreplier[sr.origin]{
+		if utils.ArrayEquals(replier.keywords, sr.keywords) {
+			g.searchreplier[sr.origin] = append(g.searchreplier[sr.origin][:index],g.searchreplier[sr.origin][index+1:]...)
+		}
+	}
+}
+
+//================================
+//File Searcher
+//================================
+func (g *Gossiper) getFileSearcher() *FileSearcher {
+	if g.fileSearcher == nil {
+		g.fileSearcher = NewFileSearcher(g)
+	}
+	return g.fileSearcher
+}
+
+func (g *Gossiper) deleteFileSearcher() {
+	g.fileSearcher = nil
+}
+
 
 //================================
 //NO CATEGORY
