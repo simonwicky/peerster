@@ -93,7 +93,7 @@ func (g *Gossiper) clientFileRequestHandler(message *utils.Message) {
 }
 
 func (g *Gossiper) clientFileIndexHandler(message *utils.Message) {
-	g.fileStorage.addFromSystem(*message.File)
+	g.fileStorage.addFromSystem(g, *message.File)
 }
 
 func(g *Gossiper) clientFileSearchHandler(message *utils.Message) {

@@ -1,4 +1,3 @@
-
 package gossiper
 
 import ("net"
@@ -30,8 +29,10 @@ type Gossiper struct {
 	currentStatus utils.StatusPacket
 	currentStatus_lock sync.RWMutex
 	//Counter
-	counter uint32
-	counter_lock sync.Mutex
+	rumor_counter uint32
+	rumor_counter_lock sync.Mutex
+	TLC_counter uint32
+	TLC_counter_lock sync.Mutex
 
 	//timer
 	antiEntropyTicker *time.Ticker
@@ -60,13 +61,23 @@ type Gossiper struct {
 	//storage
 	fileStorage *FileStorage
 	messages map[utils.RumorMessageKey]utils.RumorMessage
+	tlcStorage *TLCstorage
+
+	//publishers
+	publishers map[uint32]*TLCPublisher
 
 	//search file
 	fileSearcher *FileSearcher
+
+	//constant value
+	hopLimit uint32
+	stubbornTimeout time.Duration
+	peersNumber uint32
+	hw3ex2 bool
 }
 
 
-func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer int) *Gossiper {
+func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer,hoplimit, peersNumber,stubbornTimeout int, hw3ex2 bool) *Gossiper {
 	rand.Seed(time.Now().Unix())
 	udpAddrPeer, err := net.ResolveUDPAddr("udp4", address)
 	if err != nil {
@@ -130,6 +141,12 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		duration,_ := time.ParseDuration(strconv.Itoa(rtimer) + "s")
 		rTimerTicker = time.NewTicker(duration)
 	}
+
+	if peersNumber == 0 {
+		fmt.Fprintln(os.Stderr,"Number of peers should be > 0")
+		return nil
+	}
+
 	return &Gossiper{
 		addressPeer: udpAddrPeer,
 		connPeer: udpConnPeer,
@@ -137,7 +154,8 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		connClient: udpConnClient,
 		Name: name,
 		knownPeers: peersArray,
-		counter: 1,
+		rumor_counter: 1,
+		TLC_counter: 1,
 		messages : make(map[utils.RumorMessageKey]utils.RumorMessage,10),
 		workers : make(map[string]*Rumormonger),
 		DSDV : make(map[string] string),
@@ -146,9 +164,15 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		uiBuffer : make(chan utils.GossipPacket, 10),
 		latestRumors : utils.NewRumorKeyQueue(50),
 		fileStorage : NewFileStorage(),
+		tlcStorage : NewTLCstorage(),
 		downloader : make(map[string]*Datadownloader),
 		searchreplier : make(map[string][]*SearchReplier),
+		publishers : make(map[uint32]*TLCPublisher),
 		fileSearcher : nil,
+		hopLimit : uint32(hoplimit),
+		peersNumber : uint32(peersNumber),
+		stubbornTimeout : time.Duration(stubbornTimeout),
+		hw3ex2 : hw3ex2,
 	}
 }
 //================================
@@ -473,6 +497,25 @@ func (g *Gossiper) deleteFileSearcher() {
 	g.fileSearcher = nil
 }
 
+//==============================
+//TLCPublisher
+//==============================
+func (g *Gossiper) addPublisher(p *TLCPublisher) {
+	g.publishers[p.id] = p
+}
+
+func (g *Gossiper) deletePublisher(p *TLCPublisher) {
+	g.publishers[p.id] = nil
+}
+
+func (g *Gossiper) lookupPublisher(id uint32) *TLCPublisher {
+	p,ok := g.publishers[id]
+	if ok {
+		return p
+	}
+	return nil
+}
+
 
 //================================
 //NO CATEGORY
@@ -480,10 +523,10 @@ func (g *Gossiper) deleteFileSearcher() {
 func (g *Gossiper) generateRumor(text string) utils.RumorMessage{
 	var rumor utils.RumorMessage
 	rumor.Origin = g.Name
-	g.counter_lock.Lock()
-	rumor.ID = g.counter
-	g.counter += 1
-	g.counter_lock.Unlock()
+	g.rumor_counter_lock.Lock()
+	rumor.ID = g.rumor_counter
+	g.rumor_counter += 1
+	g.rumor_counter_lock.Unlock()
 	rumor.Text = text
 	statusIndex := -1
 	for index,status := range g.currentStatus.Want {
@@ -495,6 +538,14 @@ func (g *Gossiper) generateRumor(text string) utils.RumorMessage{
 	//add the message to storage
 	g.addMessage(&rumor)
 	return rumor
+}
+
+func (g *Gossiper) getTLCID() uint32 {
+	g.TLC_counter_lock.Lock()
+	id := g.TLC_counter
+	g.TLC_counter += 1
+	g.TLC_counter_lock.Unlock()
+	return id
 }
 
 

@@ -79,6 +79,31 @@ type SearchResult struct {
 	ChunkCount uint64
 }
 
+type TxPublish struct {
+	Name string
+	Size int64
+	MetafileHash []byte
+}
+
+type BlockPublish struct {
+	PrevHash [32]byte
+	Transaction TxPublish
+}
+
+type TLCMessage struct {
+	Origin string
+	ID	uint32
+	Confirmed bool
+	TxBlock BlockPublish
+	VectorClock *StatusPacket
+	Fitness float32
+}
+
+type TLCAck struct {
+	Origin string
+	ID uint32
+}
+
 type GossipPacket struct {
 	Simple *SimpleMessage
 	Rumor *RumorMessage
@@ -88,4 +113,6 @@ type GossipPacket struct {
 	DataReply *DataReply
 	SearchRequest *SearchRequest
 	SearchReply *SearchReply
+	TLCMessage *TLCMessage
+	Ack *TLCAck
 }

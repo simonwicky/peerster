@@ -38,7 +38,7 @@ func NewFileStorage() *FileStorage {
 }
 
 
-func (fs *FileStorage) addFromSystem(name string){
+func (fs *FileStorage) addFromSystem(g* Gossiper, name string){
 	file,err := os.Open(SHARED_FILE_FOLDER + name)
 	defer file.Close()
 	if err != nil {
@@ -64,7 +64,7 @@ func (fs *FileStorage) addFromSystem(name string){
 			return
 		}
 		fileMetaData.data = append(fileMetaData.data,buffer...)
-		fileMetaData.chunkmap = append(fileMetaData.chunkmap,uint64(offset) + 1)
+		fileMetaData.chunkmap = append(fileMetaData.chunkmap,uint64(offset))
 		currentChecksum := sha256.Sum256(buffer[:n])
 		//converting [32]byte to []byte
 		bytes := currentChecksum[:]
@@ -81,6 +81,11 @@ func (fs *FileStorage) addFromSystem(name string){
 	fmt.Fprintln(os.Stderr,"Indexed file: " + fs.data[fileMetaData.sha].name)
 	fmt.Fprintln(os.Stderr,"Id file: " + string(fileMetaData.sha))
 	fs.lock.Unlock()
+
+	//TLCMessage
+	if g.hw3ex2 {
+		Publish(g, fileMetaData.name, fileMetaData.size, fileMetaData.metafileHash)
+	}
 }
 
 

@@ -23,7 +23,7 @@ func (g *Gossiper) uiPrivateMessageHandler(packet *utils.GossipPacket) {
 }
 
 func (g *Gossiper) uiFileIndexHandler(fileName string){
-	g.fileStorage.addFromSystem(fileName)
+	g.fileStorage.addFromSystem(g,fileName)
 }
 
 func (g *Gossiper) uiFileDownloadHandler(hash []byte, destination ,fileName string){

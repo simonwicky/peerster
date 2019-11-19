@@ -42,6 +42,8 @@ func (g *Gossiper) PeersHandle(simple bool){
 						g.peerSearchReplyHandler(&packet)
 					case packet.Rumor != nil || packet.Status != nil:
 						g.peerRumorStatusHandler(&packet,address.String())
+					case packet.TLCMessage != nil :
+						g.peerTLCMessageHandler(&packet)
 					default:
 						fmt.Fprintln(os.Stderr,"Message unknown, dropping packet")
 				}
@@ -73,6 +75,15 @@ func (g *Gossiper) peerPrivateMessageHandler(packet *utils.GossipPacket){
 	fmt.Fprintln(os.Stderr,"PrivateMessage received")
 	pm := packet.Private
 	if pm.Destination == g.Name {
+		if pm.ID != 0 {
+			fmt.Fprintln(os.Stderr,"TLCACK received")
+			if p := g.lookupPublisher(pm.ID); p != nil {
+				p.acks <- pm
+			} else {
+				fmt.Fprintln(os.Stderr,"Publisher not found, dropping packet")
+			}
+			return
+		}
 		utils.LogPrivate(pm)
 		return
 	}
@@ -127,5 +138,25 @@ func (g *Gossiper) peerSearchReplyHandler(packet *utils.GossipPacket){
 		searcher.replies <- reply
 	} else {
 		fmt.Fprintln(os.Stderr,"Search not in progress")
+	}
+}
+
+func (g *Gossiper) peerTLCMessageHandler(packet *utils.GossipPacket){
+	msg := packet.TLCMessage
+	if msg.Origin == g.Name {
+		return
+	}
+	utils.LogTLCGossip(msg)
+	if msg.Confirmed{
+		g.tlcStorage.addMessage(msg)
+		return
+	}
+	if !g.tlcStorage.lookupName(msg.TxBlock.Transaction.Name) {
+		g.tlcStorage.addMessage(msg)
+		g.TLCAck(packet)
+		g.sendToKnownPeers("", packet)
+	} else {
+		fmt.Fprintln(os.Stderr,"mapping already exists")
+		//don't ack the message, for now nothing
 	}
 }

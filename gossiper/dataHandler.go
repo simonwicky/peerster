@@ -71,16 +71,16 @@ func (dd *Datadownloader) Start(){
 		copy(dd.waitingFor,chunkID_bytes)
 		fmt.Fprintln(os.Stderr,"Chunk ID: " + hex.EncodeToString(dd.waitingFor))
 		if dd.destination == "" {
-			downloadFrom = dd.g.fileStorage.data[dd.id].chunkLocation[uint64(offset + 1)]
+			downloadFrom = dd.g.fileStorage.data[dd.id].chunkLocation[uint64(offset)]
 		}
-		utils.LogChunk(dd.fileName,downloadFrom, offset + 1)
+		utils.LogChunk(dd.fileName,downloadFrom, offset)
 		chunk_reply := dd.requestAndReceiveData(downloadFrom)
 		if chunk_reply == nil || len(chunk_reply.Data) == 0 {
 			fmt.Fprintln(os.Stderr,"Empty data field or too much trial")
 			return
 		}
 		dd.data = append(dd.data, chunk_reply.Data...)
-		dd.g.fileStorage.addChunk(chunk_reply.Data, dd.id, offset + 1)
+		dd.g.fileStorage.addChunk(chunk_reply.Data, dd.id, offset)
 	}
 	//save the file
 	if dd.g.fileStorage.checkFile(dd.id) {

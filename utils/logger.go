@@ -1,7 +1,8 @@
 package utils
 
 import ("fmt"
-		"strings")
+		"strings"
+		"encoding/hex")
 
 func LogRumor(packet *RumorMessage, address string){
 	fmt.Printf("RUMOR origin %s from %s ID %d contents %s\n",packet.Origin,address,packet.ID,packet.Text)
@@ -73,3 +74,22 @@ func LogFileFound(name, peer, metafile string, chunkMap []uint64){
 	fmt.Printf("\n")
 
 }
+
+func LogTLCGossip(message *TLCMessage){
+	if message.Confirmed{
+		fmt.Printf("CONFIRMED ")
+	} else {
+		fmt.Printf("UNCONFIRMED ")
+	}
+	fmt.Printf("GOSSIP origin %s ID %d file name %s size %d metahash %s\n",message.Origin, message.ID, message.TxBlock.Transaction.Name,message.TxBlock.Transaction.Size,hex.EncodeToString(message.TxBlock.Transaction.MetafileHash))
+
+}
+
+func LogConfirmedID(id uint32, witnesses []string){
+	fmt.Printf("RE-BROADCAST ID %d WITNESSES %s\n", id, strings.Join(witnesses, ","))
+}
+
+func LogAck(origin string, id uint32){
+	fmt.Printf("SENDING ACK origin %s ID %d\n", origin,id)
+}
+
