@@ -44,6 +44,8 @@ func (g *Gossiper) PeersHandle(simple bool){
 						g.peerRumorStatusHandler(&packet,address.String())
 					case packet.TLCMessage != nil :
 						g.peerTLCMessageHandler(&packet)
+					case packet.Ack != nil :
+						g.peerTLCAckHandler(&packet)
 					default:
 						fmt.Fprintln(os.Stderr,"Message unknown, dropping packet")
 				}
@@ -75,15 +77,6 @@ func (g *Gossiper) peerPrivateMessageHandler(packet *utils.GossipPacket){
 	fmt.Fprintln(os.Stderr,"PrivateMessage received")
 	pm := packet.Private
 	if pm.Destination == g.Name {
-		if pm.ID != 0 {
-			fmt.Fprintln(os.Stderr,"TLCACK received")
-			if p := g.lookupPublisher(pm.ID); p != nil {
-				p.acks <- pm
-			} else {
-				fmt.Fprintln(os.Stderr,"Publisher not found, dropping packet")
-			}
-			return
-		}
 		utils.LogPrivate(pm)
 		return
 	}
@@ -160,3 +153,19 @@ func (g *Gossiper) peerTLCMessageHandler(packet *utils.GossipPacket){
 		//don't ack the message, for now nothing
 	}
 }
+
+func (g *Gossiper) peerTLCAckHandler(packet *utils.GossipPacket){
+	fmt.Fprintln(os.Stderr,"TLCACK received")
+	ack := packet.Ack
+	if ack.Destination == g.Name {
+		if p := g.lookupPublisher(ack.ID); p != nil {
+			p.acks <- ack
+		} else {
+			fmt.Fprintln(os.Stderr,"Publisher not found, dropping packet")
+		}
+		return
+	}
+	go g.sendPointToPoint(packet, ack.Destination)
+
+}
+

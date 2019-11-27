@@ -269,6 +269,8 @@ func (g *Gossiper) sendPointToPoint(packet *utils.GossipPacket, destination stri
 		hoplimit = &packet.DataReply.HopLimit
 	case packet.SearchReply != nil:
 		hoplimit = &packet.SearchReply.HopLimit
+	case packet.Ack != nil:
+		hoplimit = &packet.Ack.HopLimit
 	default:
 		fmt.Fprintln(os.Stderr,"Packet which should not be sent point to point, exiting")
 		return

@@ -23,6 +23,7 @@ func (g *Gossiper) HttpServerHandler(port string) {
 	r.HandleFunc("/download", g.downloadHandler).Methods("POST")
 	r.HandleFunc("/keywords", g.keywordsHandler).Methods("POST")
 	r.HandleFunc("/downloadsearch",g.downloadSearchedHandler).Methods("POST")
+	r.HandleFunc("/TLCNames", g.TLCNamesHandler).Methods("GET")
 	r.PathPrefix("/").Handler(http.StripPrefix("/", http.FileServer(http.Dir("webclient"))))
 	http.ListenAndServe(":"+port,r)
 }
@@ -131,6 +132,13 @@ func (g *Gossiper) keywordsHandler(w http.ResponseWriter, r *http.Request){
 			keywords := string(body)
 			matches := g.uiFileSearchHandler(keywords)
 			fmt.Fprintf(w,matches)
+	}
+}
+func (g *Gossiper) TLCNamesHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+		case "GET":
+			w.WriteHeader(http.StatusOK)
+			fmt.Fprintf(w,"%s",g.uiGetTLCMessages())
 	}
 }
 

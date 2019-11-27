@@ -34,7 +34,7 @@ func NewRumormonger(gossiper *Gossiper, address string, buffer chan utils.Gossip
 }
 
 func (r *Rumormonger) Start() {
-	fmt.Fprintf(os.Stderr,"STARTING talking with %s\n", r.address)
+	fmt.Fprintf(os.Stderr,"STARTED talking with %s\n", r.address)
 	for {
 		if r.synced && !r.waitingForAck {
 			return
@@ -55,6 +55,7 @@ func (r *Rumormonger) Start() {
 				if r.waitingForAck {
 					if r.timer == nil {
 						fmt.Fprintln(os.Stderr,"Timer is nil")
+						return
 					}
 					select {
 						case _ = <- r.timer.C :
@@ -151,7 +152,7 @@ func (r *Rumormonger) checkVectorClock(status *utils.StatusPacket) *utils.Gossip
 				if localStatus.NextID > extStatus.NextID {
 					msg := r.G.getMessage(extStatus.Identifer, extStatus.NextID)
 					return &utils.GossipPacket{Rumor : &msg}
-				}	
+				}
 			}
 		}
 	}
@@ -188,6 +189,3 @@ func (r *Rumormonger) flipCoin(packet *utils.GossipPacket) {
 	}
 }
 
-func (r *Rumormonger) setCurrentRumor(packet *utils.GossipPacket) {
-	r.currentRumor = packet
-}

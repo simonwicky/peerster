@@ -32,3 +32,15 @@ func (t *TLCstorage) addMessage(msg *utils.TLCMessage) {
 	t.data[name] = msg
 	t.lock.Unlock()
 }
+
+func (t *TLCstorage) getConfirmedMessages() []*utils.TLCMessage{
+	var confirmed []*utils.TLCMessage
+	t.lock.RLock()
+	defer t.lock.RUnlock()
+	for _,msg := range t.data {
+		if msg.Confirmed {
+			confirmed = append(confirmed,msg)
+		}
+	}
+	return confirmed
+}

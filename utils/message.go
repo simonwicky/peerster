@@ -99,10 +99,7 @@ type TLCMessage struct {
 	Fitness float32
 }
 
-type TLCAck struct {
-	Origin string
-	ID uint32
-}
+type TLCAck PrivateMessage
 
 type GossipPacket struct {
 	Simple *SimpleMessage

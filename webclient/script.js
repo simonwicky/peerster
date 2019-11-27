@@ -181,6 +181,27 @@ $(document).ready(function(){
 		});
 	};
 
+	function updateTLCNames(){
+		$.ajax({
+			type: "GET",
+			url:"/TLCNames",
+			datatype: "string",
+			success: function(data,status){
+				var list = data.split(",");
+				var ul = document.createElement("ul");
+				ul.id = "confirmed-name"
+				for(var i = 0; i < list.length; i++){
+					var li = document.createElement("li");
+					li.innerHTML = list[i];
+					ul.appendChild(li);
+				}
+				var box = document.getElementById("confirmed-name-box");
+				box.innerHTML = "";
+				box.appendChild(ul);
+			}
+		});
+	}
+
 	function getID(){
 		$.ajax({
 			type: "GET",
@@ -199,10 +220,12 @@ $(document).ready(function(){
 	updateMessages();
 	getID();
 	updateNodes();
+	updateTLCNames();
 	setInterval(function(){
 		updateMessages();
 		updatePeers();
 		updateNodes();
+		updateTLCNames();
 	},1000);
 
 });

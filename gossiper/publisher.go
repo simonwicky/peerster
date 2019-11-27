@@ -12,20 +12,18 @@ type TLCPublisher struct {
 	nbAcks uint32
 	ackList []string
 	g *Gossiper
-	acks chan *utils.PrivateMessage
+	acks chan *utils.TLCAck
 	running bool
 }
 
 
 func Publish(g *Gossiper, name string, size int64, metafileHash []byte) {
-//send TLCMessages and wait for acks use stubbornTimeout in gossiper
-//broadcast the confirmed message
 	publisher := &TLCPublisher{
 		id : g.getTLCID(),
 		nbAcks : 1,
 		g : g,
 		ackList : []string{g.Name},
-		acks : make(chan *utils.PrivateMessage),
+		acks : make(chan *utils.TLCAck),
 		running : true,
 	}
 	g.addPublisher(publisher)
@@ -56,6 +54,7 @@ func (p* TLCPublisher) sendTLCMessage(name string, size int64, metafileHash []by
 	}
 	timeout := time.NewTimer(time.Second * p.g.stubbornTimeout)
 	p.g.sendToKnownPeers("",&utils.GossipPacket{TLCMessage : message})
+	p.g.tlcStorage.addMessage(message)
 	for {
 		if !p.running {
 			return

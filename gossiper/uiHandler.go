@@ -71,6 +71,15 @@ func (g *Gossiper) uiFileSearchHandler(keywords string) string{
 	return strings.Join(names,",")
 }
 
+func (g *Gossiper) uiGetTLCMessages() string {
+	msgs := g.tlcStorage.getConfirmedMessages()
+	var names []string
+	for _,m := range msgs {
+		names = append(names,m.TxBlock.Transaction.Name)
+	}
+	return strings.Join(names, ",")
+}
+
 
 
 func (g *Gossiper) getLatestRumors() utils.RumorMessages{
