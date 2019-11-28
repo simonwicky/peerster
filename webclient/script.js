@@ -212,7 +212,20 @@ $(document).ready(function(){
 					data = "Unknown";
 				}
 				document.getElementById("my-id").innerHTML = data;
-				document.title = "Peerster : " + data; 
+				document.title = "Peerster : " + data;
+			}
+		})
+	}
+	function getRound(){
+		$.ajax({
+			type: "GET",
+			url: "/round",
+			datatype: "string",
+			success: function(data,status) {
+				if (data == ""){
+					data = "Unknown";
+				}
+				document.getElementById("my-round").innerHTML = data;
 			}
 		})
 	}
@@ -222,11 +235,13 @@ $(document).ready(function(){
 	getID();
 	updateNodes();
 	updateTLCNames();
+	getRound();
 	setInterval(function(){
 		updateMessages();
 		updatePeers();
 		updateNodes();
 		updateTLCNames();
+		getRound();
 	},1000);
 
 });

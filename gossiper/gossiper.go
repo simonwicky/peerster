@@ -79,10 +79,14 @@ type Gossiper struct {
 	peersNumber uint32
 	hw3ex2 bool
 	hw3ex3 bool
+	hw3ex4 bool
+
+	//blockChain
+	blockChain []*utils.BlockPublish
 }
 
 
-func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer,hoplimit, peersNumber,stubbornTimeout int, hw3ex2,hw3ex3 bool) *Gossiper {
+func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer,hoplimit, peersNumber,stubbornTimeout int, hw3ex2,hw3ex3,hw3ex4 bool) *Gossiper {
 	rand.Seed(time.Now().Unix())
 	udpAddrPeer, err := net.ResolveUDPAddr("udp4", address)
 	if err != nil {
@@ -179,6 +183,7 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		stubbornTimeout : time.Duration(stubbornTimeout),
 		hw3ex2 : hw3ex2,
 		hw3ex3 : hw3ex3,
+		hw3ex4 : hw3ex4,
 	}
 }
 //================================
@@ -535,18 +540,18 @@ func (g *Gossiper) lookupPublisher(id uint32) *TLCPublisher {
 }
 
 func (g *Gossiper) checkPublisher(roundID uint32) *TLCPublisher {
-	fmt.Fprintln(os.Stderr,roundID)
 	for _, p := range g.publishers {
 		if p != nil && p.roundID == roundID {
 			return p
 		}
 	}
-	fmt.Fprintln(os.Stderr,"here")
 	return nil
 }
+
 func (g *Gossiper) bufferInfos(infos *utils.FileInfo) {
 	g.publisherBuffer = append(g.publisherBuffer,infos)
 }
+
 func (g *Gossiper) getNextPublishInfos() *utils.FileInfo{
 	if len(g.publisherBuffer) == 0 {
 		return nil

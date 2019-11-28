@@ -143,6 +143,7 @@ func (g *Gossiper) peerTLCMessageHandler(packet *utils.GossipPacket, address str
 		return
 	}
 	utils.LogTLCGossip(msg)
+
 	if msg.Confirmed != -1 {
 		g.tlcStorage.addMessage(msg)
 		publisher := g.checkPublisher(uint32(msg.Confirmed))

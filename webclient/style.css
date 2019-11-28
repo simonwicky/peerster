@@ -68,7 +68,9 @@
 	border: 1px solid blue;
 }
 
-#identifier{
+#identifier,#round{
+	width:45%;
+	display:inline-block;
 	margin : 5px;
 	overflow-x: scroll;
 	border : 1px solid blue;

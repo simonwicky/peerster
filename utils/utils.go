@@ -1,4 +1,6 @@
 package utils
+import ("crypto/sha256"
+		"encoding/binary")
 
 func ArrayEquals(a []string, b []string) bool {
 	if len(a) != len(b){
@@ -40,4 +42,24 @@ func CopyGossipPacket(packet *GossipPacket) *GossipPacket {
 	}
 	newPacket := &GossipPacket{Simple : simple, Rumor : rumor, Status : status,TLCMessage : TLC,}
 	return newPacket
+}
+
+func (t *TxPublish) Hash() (out [32]byte) {
+ 	h := sha256.New()
+ 	binary.Write(h,binary.LittleEndian,
+ 	uint32(len(t.Name)))
+ 	h.Write([]byte(t.Name))
+ 	h.Write(t.MetafileHash)
+ 	copy(out[:], h.Sum(nil))
+ 	return
+}
+
+
+func (b *BlockPublish) Hash() (out [32]byte) {
+	h := sha256.New()
+	h.Write(b.PrevHash[:])
+	th := b.Transaction.Hash()
+	h.Write(th[:])
+	copy(out[:], h.Sum(nil))
+	return
 }

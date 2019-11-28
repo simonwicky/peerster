@@ -137,8 +137,7 @@ func (p *TLCPublisher) handleRoundTransition(){
 			p.nbMsg += 1
 		}
 	}
-	fmt.Fprintln(os.Stderr,"WAITING FOR CONFIRMED MESSAGES")
-	fmt.Fprintln(os.Stderr,p.nbMsg)
+	fmt.Fprintln(os.Stderr,"Waiting for confirmed message")
 	for p.nbMsg <= p.g.peersNumber / 2 {
 		msg := <- p.msg
 		p.msgList = append(p.msgList,msg)
@@ -148,9 +147,13 @@ func (p *TLCPublisher) handleRoundTransition(){
 		p.running = false
 		p.g.bufferInfos(p.infos)
 	}
-	p.g.incrementTLCRound()
-	utils.LogNextRound(p.g.getTLCRound(),p.msgList)
-	p.g.deletePublisher(p.id)
+	if p.g.hw3ex4 {
+
+	} else {
+		p.g.incrementTLCRound()
+		utils.LogNextRound(p.g.getTLCRound(),p.msgList)
+		p.g.deletePublisher(p.id)
+	}
 	infos := p.g.getNextPublishInfos()
 	if infos == nil {
 		return
