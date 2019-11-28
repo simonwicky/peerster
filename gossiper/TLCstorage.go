@@ -22,8 +22,8 @@ func NewTLCstorage() *TLCstorage {
 func (t *TLCstorage) lookupName(name string) bool {
 	t.lock.RLock()
 	defer t.lock.RUnlock()
-	_,ok := t.data[name]
-	return ok
+	msg,ok := t.data[name]
+	return ok && msg.Confirmed != -1
 }
 
 func (t *TLCstorage) addMessage(msg *utils.TLCMessage) {
@@ -38,7 +38,7 @@ func (t *TLCstorage) getConfirmedMessages() []*utils.TLCMessage{
 	t.lock.RLock()
 	defer t.lock.RUnlock()
 	for _,msg := range t.data {
-		if msg.Confirmed {
+		if msg.Confirmed != -1{
 			confirmed = append(confirmed,msg)
 		}
 	}

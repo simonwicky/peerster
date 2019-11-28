@@ -9,33 +9,60 @@ import ("github.com/simonwicky/Peerster/utils"
 
 type TLCPublisher struct {
 	id uint32
+	roundID uint32
 	nbAcks uint32
+	acks chan *utils.TLCAck
 	ackList []string
 	g *Gossiper
-	acks chan *utils.TLCAck
+	msg chan *utils.TLCMessage
+	msgList []*utils.TLCMessage
+	nbMsg uint32
 	running bool
+	infos *utils.FileInfo
 }
 
 
-func Publish(g *Gossiper, name string, size int64, metafileHash []byte) {
+func Publish(g *Gossiper, infos *utils.FileInfo) {
+	if g.hw3ex3 && g.checkPublisher(g.getTLCRound()) != nil {
+		g.bufferInfos(infos)
+		return
+	}
 	publisher := &TLCPublisher{
 		id : g.getTLCID(),
-		nbAcks : 1,
+		roundID : g.getTLCRound(),
+		nbAcks : 1, //for itself
 		g : g,
 		ackList : []string{g.Name},
-		acks : make(chan *utils.TLCAck),
-		running : true,
+		acks : make(chan *utils.TLCAck,g.peersNumber),
+		msg : make(chan *utils.TLCMessage,g.peersNumber),
+		nbMsg : 0,
+		running : false,
+		infos : infos,
 	}
-	g.addPublisher(publisher)
-	go publisher.sendTLCMessage(name,size,metafileHash,false)
-	publisher.handleAcks()
-	utils.LogConfirmedID(publisher.id, publisher.ackList)
-	publisher.sendTLCMessage(name,size,metafileHash, true)
-
+	publisher.Start()
 }
 
-func (p* TLCPublisher) sendTLCMessage(name string, size int64, metafileHash []byte, confirmed bool) {
-		txPublish := utils.TxPublish{
+func (p *TLCPublisher) Start() {
+	p.running = true
+	p.g.addPublisher(p)
+	go p.sendTLCMessage(p.infos.Name,p.infos.Size,p.infos.MetafileHash,-1, p.id)
+	if p.g.hw3ex3 {
+		go p.handleRoundTransition()
+	}
+	p.handleAcks()
+	utils.LogConfirmedID(p.id, p.ackList)
+	p.sendTLCMessage(p.infos.Name,p.infos.Size,p.infos.MetafileHash, int(p.roundID), p.g.getTLCID())
+	if !p.g.hw3ex3 {
+		p.g.deletePublisher(p.id)
+	}
+}
+
+func (p* TLCPublisher) sendTLCMessage(name string, size int64, metafileHash []byte, confirmed int, id uint32) {
+	if p.g.hw3ex3 && !p.running {
+		//no broadcast if moving to next round
+		return
+	}
+	txPublish := utils.TxPublish{
 		Name: name,
 		Size: size,
 		MetafileHash: metafileHash,
@@ -46,15 +73,22 @@ func (p* TLCPublisher) sendTLCMessage(name string, size int64, metafileHash []by
 	}
 	message := &utils.TLCMessage{
 		Origin : p.g.Name,
-		ID : p.id,
+		ID : id,
 		Confirmed : confirmed,
 		TxBlock : block,
-		VectorClock : nil,
+		VectorClock : &p.g.currentStatus,
 		Fitness : 0,
 	}
 	timeout := time.NewTimer(time.Second * p.g.stubbornTimeout)
-	p.g.sendToKnownPeers("",&utils.GossipPacket{TLCMessage : message})
+	p.g.sendToRandomPeer(&utils.GossipPacket{TLCMessage : message})
 	p.g.tlcStorage.addMessage(message)
+	if confirmed != -1 {
+		publisher := p.g.checkPublisher(uint32(confirmed))
+		if (publisher != nil) {
+			publisher.msg <- message
+		}
+		p.running = false
+	}
 	for {
 		if !p.running {
 			return
@@ -62,7 +96,7 @@ func (p* TLCPublisher) sendTLCMessage(name string, size int64, metafileHash []by
 		select {
 			case _ = <- timeout.C:
 				timeout.Reset(p.g.stubbornTimeout * time.Second)
-				p.g.sendToKnownPeers("",&utils.GossipPacket{TLCMessage : message})
+				p.g.sendToRandomPeer(&utils.GossipPacket{TLCMessage : message})
 			default:
 				time.Sleep(500 * time.Millisecond)
 		}
@@ -73,7 +107,7 @@ func (p* TLCPublisher) sendTLCMessage(name string, size int64, metafileHash []by
 func (p *TLCPublisher) handleAcks(){
 	for {
 		if p.nbAcks > p.g.peersNumber / 2 {
-			p.running = false
+			fmt.Fprintln(os.Stderr,"Enough ACK received")
 			return
 		}
 		select {
@@ -95,10 +129,40 @@ func (p *TLCPublisher) handleAcks(){
 	}
 }
 
+func (p *TLCPublisher) handleRoundTransition(){
+	confirmed := p.g.tlcStorage.getConfirmedMessages()
+	for _,msg := range confirmed {
+		if msg.Confirmed == int(p.roundID) {
+			p.msgList = append(p.msgList, msg)
+			p.nbMsg += 1
+		}
+	}
+	fmt.Fprintln(os.Stderr,"WAITING FOR CONFIRMED MESSAGES")
+	fmt.Fprintln(os.Stderr,p.nbMsg)
+	for p.nbMsg <= p.g.peersNumber / 2 {
+		msg := <- p.msg
+		p.msgList = append(p.msgList,msg)
+		p.nbMsg += 1
+	}
+	if p.running {
+		p.running = false
+		p.g.bufferInfos(p.infos)
+	}
+	p.g.incrementTLCRound()
+	utils.LogNextRound(p.g.getTLCRound(),p.msgList)
+	p.g.deletePublisher(p.id)
+	infos := p.g.getNextPublishInfos()
+	if infos == nil {
+		return
+	}
+	Publish(p.g,infos)
+}
+
+
 
 func (g *Gossiper) TLCAck(packet *utils.GossipPacket){
 	msg := packet.TLCMessage
-	pm := utils.PrivateMessage{
+	ack := utils.TLCAck{
 		Origin: g.Name,
 		ID: msg.ID,
 		Text : "",
@@ -106,5 +170,5 @@ func (g *Gossiper) TLCAck(packet *utils.GossipPacket){
 		HopLimit: g.hopLimit,
 	}
 	utils.LogAck(msg.Origin, msg.ID)
-	g.sendPointToPoint(&utils.GossipPacket{Private: &pm}, pm.Destination)
+	g.sendPointToPoint(&utils.GossipPacket{Ack: &ack}, ack.Destination)
 }

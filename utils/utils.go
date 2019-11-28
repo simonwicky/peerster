@@ -34,6 +34,10 @@ func CopyGossipPacket(packet *GossipPacket) *GossipPacket {
 	} else {
 		status = nil
 	}
-	newPacket := &GossipPacket{Simple : simple, Rumor : rumor, Status : status}
+	var TLC *TLCMessage
+	if packet.TLCMessage != nil {
+		TLC = &(*packet.TLCMessage)
+	}
+	newPacket := &GossipPacket{Simple : simple, Rumor : rumor, Status : status,TLCMessage : TLC,}
 	return newPacket
 }

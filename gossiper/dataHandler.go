@@ -97,7 +97,7 @@ func (dd *Datadownloader) requestAndReceiveData(destination string) *utils.DataR
 	dr := &utils.DataRequest{
 		Origin : dd.g.Name,
 		Destination : destination,
-		HopLimit : 10,
+		HopLimit : dd.g.hopLimit,
 		HashValue : dd.waitingFor,
 	}
 	dd.timeout = time.NewTimer(5 * time.Second)
@@ -111,7 +111,7 @@ func (dd *Datadownloader) requestAndReceiveData(destination string) *utils.DataR
 				select {
 					case _ = <- dd.timeout.C :
 						dd.timeout.Stop()
-						dr.HopLimit = 10
+						dr.HopLimit = dd.g.hopLimit
 						dd.trial_counter -= 1
 						if dd.trial_counter <= 0 {
 							fmt.Fprintln(os.Stderr,"Too much trial, aborting")
@@ -173,7 +173,7 @@ func (g *Gossiper) sendData(bytes []byte, request *utils.DataRequest){
 		reply := &utils.DataReply{
 			Origin: g.Name,
 			Destination: request.Origin,
-			HopLimit: 10,
+			HopLimit: g.hopLimit,
 			HashValue: request.HashValue,
 			Data: bytes,
 		}

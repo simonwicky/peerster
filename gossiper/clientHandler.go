@@ -74,7 +74,7 @@ func (g *Gossiper) clientPrivateMessageHandler(message *utils.Message){
 		ID: 0,
 		Text : message.Text,
 		Destination: *message.Destination,
-		HopLimit: 10,
+		HopLimit: g.hopLimit,
 	}
 
 	packet := &utils.GossipPacket{Private: &pm}
@@ -86,7 +86,7 @@ func (g *Gossiper) clientFileRequestHandler(message *utils.Message) {
 	dr := utils.DataRequest {
 		Origin: g.Name,
 		Destination: *message.Destination,
-		HopLimit: 10,
+		HopLimit: g.hopLimit,
 		HashValue : *message.Request,
 	}
 	g.NewDatadownloader(&dr, *message.File)

@@ -17,7 +17,7 @@ func (g *Gossiper) uiRumorHandler(packet *utils.GossipPacket) {
 
 func (g *Gossiper) uiPrivateMessageHandler(packet *utils.GossipPacket) {
 	packet.Private.Origin = g.Name
-	packet.Private.HopLimit = 10
+	packet.Private.HopLimit = g.hopLimit
 
 	g.sendPointToPoint(packet, packet.Private.Destination)
 }
@@ -30,7 +30,7 @@ func (g *Gossiper) uiFileDownloadHandler(hash []byte, destination ,fileName stri
 	dr := utils.DataRequest{
 		Origin: g.Name,
 		Destination: destination,
-		HopLimit:10,
+		HopLimit:g.hopLimit,
 		HashValue: make([]byte,len(hash)),
 	}
 	copy(dr.HashValue,hash)
@@ -85,7 +85,7 @@ func (g *Gossiper) uiGetTLCMessages() string {
 func (g *Gossiper) getLatestRumors() utils.RumorMessages{
 	list := []utils.RumorMessage{}
 	for _, key := range g.latestRumors.Container{
-		list = append(list, g.messages[key])
+		list = append(list, *g.messages[key].Rumor)
 	}
 	return list
 }

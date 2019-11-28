@@ -212,6 +212,7 @@ $(document).ready(function(){
 					data = "Unknown";
 				}
 				document.getElementById("my-id").innerHTML = data;
+				document.title = "Peerster : " + data; 
 			}
 		})
 	}

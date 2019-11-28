@@ -76,13 +76,12 @@ func LogFileFound(name, peer, metafile string, chunkMap []uint64){
 }
 
 func LogTLCGossip(message *TLCMessage){
-	if message.Confirmed{
+	if message.Confirmed != -1{
 		fmt.Printf("CONFIRMED ")
 	} else {
 		fmt.Printf("UNCONFIRMED ")
 	}
 	fmt.Printf("GOSSIP origin %s ID %d file name %s size %d metahash %s\n",message.Origin, message.ID, message.TxBlock.Transaction.Name,message.TxBlock.Transaction.Size,hex.EncodeToString(message.TxBlock.Transaction.MetafileHash))
-
 }
 
 func LogConfirmedID(id uint32, witnesses []string){
@@ -91,5 +90,16 @@ func LogConfirmedID(id uint32, witnesses []string){
 
 func LogAck(origin string, id uint32){
 	fmt.Printf("SENDING ACK origin %s ID %d\n", origin,id)
+}
+
+func LogNextRound(id uint32,msgs []*TLCMessage){
+	fmt.Printf("ADVANCING TO round ​%d BASED ON CONFIRMED MESSAGES ",id)
+	for index,msg := range msgs {
+		fmt.Printf("origin%d %s ID%d %d",index+1,msg.Origin, index+1, msg.ID)
+		if index != len(msgs)-1 {
+			fmt.Printf(", ")
+		}
+	}
+	fmt.Printf("\n")
 }
 

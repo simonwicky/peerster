@@ -21,13 +21,17 @@ func main() {
 	var numberPeers = flag.Int("N", 0, "Number of peers in the network")
 	var stubbornTimeout = flag.Int("stubbornTimeout",5,"Duration of the stubbornTimeout")
 	var hw3ex2 = flag.Bool("hw3ex2",false,"Enable TLCMessage when storing file")
+	var hw3ex3 = flag.Bool("hw3ex3",false,"Enable TLC Round")
+
+	var ackAll = flag.Bool("ackall",true,"Ack everything")
 	flag.Parse()
 
-	gossiper := gossiper.NewGossiper("127.0.0.1:" + *udpPort, *gossipAddr, *name, *peers, *antiEntropy, *rtimer, *hoplimit, *numberPeers, *stubbornTimeout, *hw3ex2)
+	gossiper := gossiper.NewGossiper("127.0.0.1:" + *udpPort, *gossipAddr, *name, *peers, *antiEntropy, *rtimer, *hoplimit, *numberPeers, *stubbornTimeout, *hw3ex2, *hw3ex3)
 	if gossiper == nil {
 		fmt.Fprintln(os.Stderr,"Problem initializing gossiper")
 		return
 	}
+	fmt.Fprintln(os.Stderr,"GUI on port " + *guiport)
 	gossiper.Start(*simple, *guiport)
 }
 

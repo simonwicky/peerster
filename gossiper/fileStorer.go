@@ -1,6 +1,7 @@
 package gossiper
 
-import ("crypto/sha256"
+import ("github.com/simonwicky/Peerster/utils"
+		"crypto/sha256"
 		"os"
 		"fmt"
 		"encoding/hex"
@@ -84,7 +85,12 @@ func (fs *FileStorage) addFromSystem(g* Gossiper, name string){
 
 	//TLCMessage
 	if g.hw3ex2 {
-		Publish(g, fileMetaData.name, fileMetaData.size, fileMetaData.metafileHash)
+		infos := utils.FileInfo{
+			Name: fileMetaData.name,
+			Size: fileMetaData.size,
+			MetafileHash : fileMetaData.metafileHash,
+		}
+		Publish(g, &infos)
 	}
 }
 

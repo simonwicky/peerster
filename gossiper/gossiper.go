@@ -28,11 +28,14 @@ type Gossiper struct {
 	//status
 	currentStatus utils.StatusPacket
 	currentStatus_lock sync.RWMutex
+
 	//Counter
 	rumor_counter uint32
 	rumor_counter_lock sync.Mutex
 	TLC_counter uint32
 	TLC_counter_lock sync.Mutex
+	TLC_round_counter uint32
+	TLC_round_counter_lock sync.Mutex
 
 	//timer
 	antiEntropyTicker *time.Ticker
@@ -60,11 +63,12 @@ type Gossiper struct {
 
 	//storage
 	fileStorage *FileStorage
-	messages map[utils.RumorMessageKey]utils.RumorMessage
+	messages map[utils.RumorMessageKey] *utils.GossipPacket
 	tlcStorage *TLCstorage
 
 	//publishers
 	publishers map[uint32]*TLCPublisher
+	publisherBuffer []*utils.FileInfo
 
 	//search file
 	fileSearcher *FileSearcher
@@ -74,10 +78,11 @@ type Gossiper struct {
 	stubbornTimeout time.Duration
 	peersNumber uint32
 	hw3ex2 bool
+	hw3ex3 bool
 }
 
 
-func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer,hoplimit, peersNumber,stubbornTimeout int, hw3ex2 bool) *Gossiper {
+func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer,hoplimit, peersNumber,stubbornTimeout int, hw3ex2,hw3ex3 bool) *Gossiper {
 	rand.Seed(time.Now().Unix())
 	udpAddrPeer, err := net.ResolveUDPAddr("udp4", address)
 	if err != nil {
@@ -154,9 +159,9 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		connClient: udpConnClient,
 		Name: name,
 		knownPeers: peersArray,
-		rumor_counter: 1,
-		TLC_counter: 1,
-		messages : make(map[utils.RumorMessageKey]utils.RumorMessage,10),
+		rumor_counter: 0,
+		TLC_counter: 0,
+		messages : make(map[utils.RumorMessageKey]*utils.GossipPacket,10),
 		workers : make(map[string]*Rumormonger),
 		DSDV : make(map[string] string),
 		antiEntropyTicker : antiEntropyTicker,
@@ -173,6 +178,7 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		peersNumber : uint32(peersNumber),
 		stubbornTimeout : time.Duration(stubbornTimeout),
 		hw3ex2 : hw3ex2,
+		hw3ex3 : hw3ex3,
 	}
 }
 //================================
@@ -358,28 +364,38 @@ func (g *Gossiper) dumpDSDV() string {
 //================================
 //MESSAGE STORAGE
 //================================
-func (g *Gossiper) addMessage(rumor *utils.RumorMessage){
-	key := utils.RumorMessageKey{Origin : rumor.Origin, ID : rumor.ID}
+func (g *Gossiper) addMessage(packet *utils.GossipPacket){
+	tlc := packet.TLCMessage
+	rumor := packet.Rumor
+	var key utils.RumorMessageKey
+	if rumor != nil {
+		key = utils.RumorMessageKey{Origin : rumor.Origin, ID : rumor.ID}
+	} else if tlc != nil {
+		key = utils.RumorMessageKey{Origin : tlc.Origin, ID : tlc.ID}
+	}
 	if _, new := g.messages[key]; !new{
-		g.messages[key] = *rumor
-		if rumor.Text != "" {
+		g.messages[key] = packet
+		if rumor != nil && rumor.Text != "" {
 			g.latestRumors.Push(key)
 		}
 	}
 }
 
-func (g *Gossiper) getMessage(origin string, ID uint32) utils.RumorMessage {
+func (g *Gossiper) getMessage(origin string, ID uint32) *utils.GossipPacket {
 	key := utils.RumorMessageKey{Origin: origin, ID: ID}
-	msg, ok := g.messages[key]
+	packet, ok := g.messages[key]
 	if ok {
-		return msg
+		return packet
 	}
-	//rumor not sotred, might be a route rumor
-	return utils.RumorMessage{
-		Origin: origin,
-		ID: ID,
-		Text: "",
-	}
+	//rumor not stored, might be a route rumor
+	rumor := utils.RumorMessage{
+				Origin: origin,
+				ID: ID,
+				Text: "",
+			}
+	return &utils.GossipPacket {
+				Rumor : &rumor,
+		}
 }
 //================================
 //Workers
@@ -506,8 +522,8 @@ func (g *Gossiper) addPublisher(p *TLCPublisher) {
 	g.publishers[p.id] = p
 }
 
-func (g *Gossiper) deletePublisher(p *TLCPublisher) {
-	g.publishers[p.id] = nil
+func (g *Gossiper) deletePublisher(id uint32) {
+	g.publishers[id] = nil
 }
 
 func (g *Gossiper) lookupPublisher(id uint32) *TLCPublisher {
@@ -518,6 +534,28 @@ func (g *Gossiper) lookupPublisher(id uint32) *TLCPublisher {
 	return nil
 }
 
+func (g *Gossiper) checkPublisher(roundID uint32) *TLCPublisher {
+	fmt.Fprintln(os.Stderr,roundID)
+	for _, p := range g.publishers {
+		if p != nil && p.roundID == roundID {
+			return p
+		}
+	}
+	fmt.Fprintln(os.Stderr,"here")
+	return nil
+}
+func (g *Gossiper) bufferInfos(infos *utils.FileInfo) {
+	g.publisherBuffer = append(g.publisherBuffer,infos)
+}
+func (g *Gossiper) getNextPublishInfos() *utils.FileInfo{
+	if len(g.publisherBuffer) == 0 {
+		return nil
+	}
+	infos := g.publisherBuffer[0]
+	g.publisherBuffer = g.publisherBuffer[1:]
+	return infos
+}
+
 
 //================================
 //NO CATEGORY
@@ -525,10 +563,7 @@ func (g *Gossiper) lookupPublisher(id uint32) *TLCPublisher {
 func (g *Gossiper) generateRumor(text string) utils.RumorMessage{
 	var rumor utils.RumorMessage
 	rumor.Origin = g.Name
-	g.rumor_counter_lock.Lock()
-	rumor.ID = g.rumor_counter
-	g.rumor_counter += 1
-	g.rumor_counter_lock.Unlock()
+	rumor.ID = g.getRumorID()
 	rumor.Text = text
 	statusIndex := -1
 	for index,status := range g.currentStatus.Want {
@@ -538,16 +573,44 @@ func (g *Gossiper) generateRumor(text string) utils.RumorMessage{
 	}
 	g.updateStatus(utils.PeerStatus{Identifer : rumor.Origin, NextID : rumor.ID + 1}, statusIndex)
 	//add the message to storage
-	g.addMessage(&rumor)
+	g.addMessage(&utils.GossipPacket{Rumor : &rumor})
 	return rumor
 }
 
-func (g *Gossiper) getTLCID() uint32 {
+func (g *Gossiper) getRumorID() uint32 {
+	g.rumor_counter_lock.Lock()
 	g.TLC_counter_lock.Lock()
-	id := g.TLC_counter
-	g.TLC_counter += 1
+	g.rumor_counter += 1
+	id := g.rumor_counter
+	id += g.TLC_counter
 	g.TLC_counter_lock.Unlock()
+	g.rumor_counter_lock.Unlock()
 	return id
+}
+
+func (g *Gossiper) getTLCID() uint32 {
+	g.rumor_counter_lock.Lock()
+	g.TLC_counter_lock.Lock()
+	g.TLC_counter += 1
+	id := g.TLC_counter
+	id += g.rumor_counter
+	g.TLC_counter_lock.Unlock()
+	g.rumor_counter_lock.Unlock()
+	return id
+}
+
+
+func (g *Gossiper) getTLCRound() uint32 {
+	g.TLC_round_counter_lock.Lock()
+	id := g.TLC_round_counter
+	g.TLC_round_counter_lock.Unlock()
+	return id
+}
+
+func (g *Gossiper) incrementTLCRound() {
+	g.TLC_round_counter_lock.Lock()
+	g.TLC_round_counter += 1
+	g.TLC_round_counter_lock.Unlock()
 }
 
 

@@ -40,10 +40,10 @@ func (g *Gossiper) PeersHandle(simple bool){
 						g.peerSearchRequestHandler(&packet)
 					case packet.SearchReply != nil :
 						g.peerSearchReplyHandler(&packet)
-					case packet.Rumor != nil || packet.Status != nil:
+					case packet.Rumor != nil || packet.Status != nil :
 						g.peerRumorStatusHandler(&packet,address.String())
 					case packet.TLCMessage != nil :
-						g.peerTLCMessageHandler(&packet)
+						g.peerTLCMessageHandler(&packet, address.String())
 					case packet.Ack != nil :
 						g.peerTLCAckHandler(&packet)
 					default:
@@ -134,20 +134,26 @@ func (g *Gossiper) peerSearchReplyHandler(packet *utils.GossipPacket){
 	}
 }
 
-func (g *Gossiper) peerTLCMessageHandler(packet *utils.GossipPacket){
+func (g *Gossiper) peerTLCMessageHandler(packet *utils.GossipPacket, address string){
+	fmt.Fprintln(os.Stderr,"TLCMessage received")
+	//ultimately send it to the rumormonger
+	defer g.peerRumorStatusHandler(packet, address)
 	msg := packet.TLCMessage
 	if msg.Origin == g.Name {
 		return
 	}
 	utils.LogTLCGossip(msg)
-	if msg.Confirmed{
+	if msg.Confirmed != -1 {
 		g.tlcStorage.addMessage(msg)
+		publisher := g.checkPublisher(uint32(msg.Confirmed))
+		if (publisher != nil) {
+			publisher.msg <- msg
+		}
 		return
 	}
-	if !g.tlcStorage.lookupName(msg.TxBlock.Transaction.Name) {
+	if !g.tlcStorage.lookupName(msg.TxBlock.Transaction.Name){
 		g.tlcStorage.addMessage(msg)
 		g.TLCAck(packet)
-		g.sendToKnownPeers("", packet)
 	} else {
 		fmt.Fprintln(os.Stderr,"mapping already exists")
 		//don't ack the message, for now nothing

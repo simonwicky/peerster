@@ -52,7 +52,7 @@ func (sr *SearchReplier) replyRequest(){
 	reply := &utils.SearchReply{
 		Origin: sr.g.Name,
 		Destination: sr.origin,
-		HopLimit : 10,
+		HopLimit : sr.g.hopLimit,
 		Results : results,
 	}
 	sr.g.sendPointToPoint(&utils.GossipPacket{SearchReply: reply}, reply.Destination)

@@ -28,12 +28,6 @@ type PrivateMessage struct {
 	Destination string
 	HopLimit uint32
 }
-type RumorMessageKey struct {
-	Origin string
-	ID uint32
-}
-
-type RumorMessages []RumorMessage
 
 type PeerStatus struct {
 	Identifer string
@@ -93,7 +87,7 @@ type BlockPublish struct {
 type TLCMessage struct {
 	Origin string
 	ID	uint32
-	Confirmed bool
+	Confirmed int
 	TxBlock BlockPublish
 	VectorClock *StatusPacket
 	Fitness float32

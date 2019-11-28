@@ -42,7 +42,7 @@ func (r *Rumormonger) Start() {
 		select {
 			case packet := <- r.Buffer :
 				switch {
-					case packet.Rumor != nil :
+					case packet.Rumor != nil || packet.TLCMessage != nil:
 						r.rumorHandler(&packet)
 					case packet.Status != nil :
 						r.statusHandler(&packet)
@@ -73,28 +73,38 @@ func (r *Rumormonger) Start() {
 	}
 }
 
+//handle TLCMessage here
 func (r *Rumormonger) rumorHandler(packet *utils.GossipPacket) {
-	utils.LogRumor(packet.Rumor,r.address)
+	var origin string
+	var id uint32
+	if packet.Rumor != nil {
+		origin = packet.Rumor.Origin
+		id = packet.Rumor.ID
+		utils.LogRumor(packet.Rumor,r.address)
+	} else {
+		origin = packet.TLCMessage.Origin
+		id = packet.TLCMessage.ID
+	}
 	newGossiper := r.G.addToKnownPeers(r.address)
 	newMessage := false
 	utils.LogPeers(r.G.knownPeers)
 
 	//check if new peer, or new origin
-	if newGossiper || r.missingPeer(packet.Rumor.Origin,r.G.currentStatus.Want){
-		nextID := packet.Rumor.ID + 1
+	if newGossiper || r.missingPeer(origin,r.G.currentStatus.Want){
+		nextID := id + 1
 		//if the message we get is out of order, we need all of them, starting from 1
-		if packet.Rumor.ID != 1 {
+		if id != 1 {
 			nextID = 1
 		}
-		r.G.updateStatus(utils.PeerStatus{Identifer : packet.Rumor.Origin, NextID : nextID}, -1)
+		r.G.updateStatus(utils.PeerStatus{Identifer : origin, NextID : nextID}, -1)
 		newMessage = true;
 	} else {
-
+		fmt.Fprintln(os.Stderr,"Message from known peer")
 		//check if new message from known gossiper
 		for index,status := range r.G.currentStatus.Want {
-			if packet.Rumor.Origin == status.Identifer && packet.Rumor.ID == status.NextID{
+			if origin == status.Identifer && id == status.NextID{
 				//update status
-				r.G.updateStatus(utils.PeerStatus{Identifer : packet.Rumor.Origin, NextID : r.G.currentStatus.Want[index].NextID + 1}, index)
+				r.G.updateStatus(utils.PeerStatus{Identifer : origin, NextID : r.G.currentStatus.Want[index].NextID + 1}, index)
 				newMessage = true
 			}
 		}
@@ -112,10 +122,10 @@ func (r *Rumormonger) rumorHandler(packet *utils.GossipPacket) {
 		r.waitingForAck = true
 		r.timer = time.NewTimer(10 * time.Second)
 		r.currentRumor = packet
-		r.G.updateDSDV(packet.Rumor.Origin, r.address)
-		if packet.Rumor.Text != "" {
-			r.G.addMessage(packet.Rumor)
-			utils.LogDSDV(packet.Rumor.Origin, r.address)
+		r.G.updateDSDV(origin, r.address)
+		if packet.TLCMessage != nil || packet.Rumor.Text != "" {
+			r.G.addMessage(packet)
+			utils.LogDSDV(origin, r.address)
 		}
 	}
 }
@@ -140,7 +150,7 @@ func (r *Rumormonger) checkVectorClock(status *utils.StatusPacket) *utils.Gossip
 		if r.missingPeer(localStatus.Identifer,status.Want){
 			//other node doesn't know peer from local status
 			msg := r.G.getMessage(localStatus.Identifer, 1)
-			return &utils.GossipPacket{Rumor : &msg}
+			return msg
 		}
 		for _,extStatus := range status.Want {
 			//both knows the origin
@@ -151,7 +161,7 @@ func (r *Rumormonger) checkVectorClock(status *utils.StatusPacket) *utils.Gossip
 				}
 				if localStatus.NextID > extStatus.NextID {
 					msg := r.G.getMessage(extStatus.Identifer, extStatus.NextID)
-					return &utils.GossipPacket{Rumor : &msg}
+					return msg
 				}
 			}
 		}
