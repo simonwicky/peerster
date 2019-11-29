@@ -150,5 +150,7 @@ func (g *Gossiper) idHandler(w http.ResponseWriter, r *http.Request){
 
 func (g *Gossiper) roundHandler(w http.ResponseWriter, r *http.Request){
 	w.WriteHeader(http.StatusOK)
-	fmt.Fprintf(w, "%d",g.getTLCRound())
+	if !g.hw3ex3 {
+		fmt.Fprintf(w,"No Round")
+	}
 }

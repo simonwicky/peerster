@@ -83,6 +83,7 @@ type Gossiper struct {
 
 	//blockChain
 	blockChain []*utils.BlockPublish
+	consensus *Consensus
 }
 
 
@@ -184,6 +185,7 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		hw3ex2 : hw3ex2,
 		hw3ex3 : hw3ex3,
 		hw3ex4 : hw3ex4,
+		consensus : NewConsensus(),
 	}
 }
 //================================
@@ -559,6 +561,44 @@ func (g *Gossiper) getNextPublishInfos() *utils.FileInfo{
 	infos := g.publisherBuffer[0]
 	g.publisherBuffer = g.publisherBuffer[1:]
 	return infos
+}
+
+//==============================
+//Blcokchain
+//==============================
+func (g *Gossiper) getLastHash() [32]byte {
+	if len(g.blockChain) == 0{
+		return [32]byte{}
+	}
+	return g.blockChain[len(g.blockChain)-1].Hash()
+}
+
+func (g *Gossiper) addBlock(block *utils.BlockPublish) {
+	g.blockChain = append(g.blockChain,block)
+}
+
+func (g *Gossiper) checkBlockValidity(block *utils.BlockPublish) bool {
+	if !g.hw3ex4 {
+		return true
+	}
+	for _,name := range g.dumpBlockChain(){
+		if block.Transaction.Name == name {
+			return false
+		}
+	}
+
+	lastHash := g.getLastHash()
+	if hex.EncodeToString(block.PrevHash[:]) != hex.EncodeToString(lastHash[:]){
+		return false
+	}
+	return true
+}
+func (g *Gossiper) dumpBlockChain() []string {
+	result := []string{}
+	for _, block := range g.blockChain{
+		result = append(result,block.Transaction.Name)
+	}
+	return result
 }
 
 

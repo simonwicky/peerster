@@ -103,3 +103,10 @@ func LogNextRound(id uint32,msgs []*TLCMessage){
 	fmt.Printf("\n")
 }
 
+func LogConsensus(id uint32,msg *TLCMessage,nameList []string){
+	fmt.Printf("CONSENSUS ON QSC round %d message origin %s ID %d ​",id,msg.Origin,msg.ID)
+	fmt.Printf("file names ")
+	fmt.Printf(strings.Join(nameList, " "))
+	fmt.Printf(" size %d metahash %s\n", msg.TxBlock.Transaction.Size, hex.EncodeToString(msg.TxBlock.Transaction.MetafileHash))
+}
+

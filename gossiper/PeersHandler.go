@@ -146,13 +146,18 @@ func (g *Gossiper) peerTLCMessageHandler(packet *utils.GossipPacket, address str
 
 	if msg.Confirmed != -1 {
 		g.tlcStorage.addMessage(msg)
+
+		if g.hw3ex4 && g.consensus.running {
+			g.consensus.msg <- msg
+			return
+		}
 		publisher := g.checkPublisher(uint32(msg.Confirmed))
 		if (publisher != nil) {
 			publisher.msg <- msg
 		}
 		return
 	}
-	if !g.tlcStorage.lookupName(msg.TxBlock.Transaction.Name){
+	if g.checkBlockValidity(&msg.TxBlock){
 		g.tlcStorage.addMessage(msg)
 		g.TLCAck(packet)
 	} else {

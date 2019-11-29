@@ -4,6 +4,7 @@ import ("github.com/simonwicky/Peerster/utils"
 		"fmt"
 		"os"
 		"time"
+		"math/rand"
 
 )
 
@@ -68,7 +69,7 @@ func (p* TLCPublisher) sendTLCMessage(name string, size int64, metafileHash []by
 		MetafileHash: metafileHash,
 	}
 	block := utils.BlockPublish{
-		PrevHash: [32]byte{},
+		PrevHash: p.g.getLastHash(),
 		Transaction : txPublish,
 	}
 	message := &utils.TLCMessage{
@@ -77,7 +78,7 @@ func (p* TLCPublisher) sendTLCMessage(name string, size int64, metafileHash []by
 		Confirmed : confirmed,
 		TxBlock : block,
 		VectorClock : &p.g.currentStatus,
-		Fitness : 0,
+		Fitness : rand.Float32(),
 	}
 	timeout := time.NewTimer(time.Second * p.g.stubbornTimeout)
 	p.g.sendToRandomPeer(&utils.GossipPacket{TLCMessage : message})
@@ -148,12 +149,12 @@ func (p *TLCPublisher) handleRoundTransition(){
 		p.g.bufferInfos(p.infos)
 	}
 	if p.g.hw3ex4 {
-
+		p.g.consensus.Start(p.g,p.msgList)
 	} else {
 		p.g.incrementTLCRound()
 		utils.LogNextRound(p.g.getTLCRound(),p.msgList)
-		p.g.deletePublisher(p.id)
 	}
+		p.g.deletePublisher(p.id)
 	infos := p.g.getNextPublishInfos()
 	if infos == nil {
 		return

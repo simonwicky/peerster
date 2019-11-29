@@ -33,8 +33,10 @@ $(document).ready(function(){
 				ul.id = "node-list"
 				for(var i = 0; i < list.length; i++){
 					var li = document.createElement("li");
-					li.innerHTML = list[i];
-					ul.appendChild(li);
+					if (list[i].length > 0){
+						li.innerHTML = list[i];
+						ul.appendChild(li);
+					}
 				}
 				var nodeBox = document.getElementById("node-box");
 				nodeBox.innerHTML = "";
@@ -52,12 +54,18 @@ $(document).ready(function(){
 				var list = data.split(",");
 				var select = document.createElement("select");
 				select.id = "id-list";
-				select.size = list.length;
+				if (list.length == 1) {
+					select.size = 2;
+				} else {
+					select.size = list.length;
+				}
 				for(var i = 0; i < list.length; i++){
 					var option = document.createElement("option");
-					option.innerHTML = list[i];
-					option.value = list[i];
-					select.appendChild(option);
+					if (list[i].length > 0){
+						option.innerHTML = list[i];
+						option.value = list[i];
+						select.appendChild(option);
+					}
 				}
 				var idBox = document.getElementById("id-box");
 				idBox.innerHTML = "";
@@ -85,9 +93,6 @@ $(document).ready(function(){
 		});
 	});
 
-	$("#refresh-identifier").click(function(){
-		updateNodes()
-	});
 
 	$("#send").click(function(){
 		var text = $("#message").val();
@@ -104,7 +109,6 @@ $(document).ready(function(){
 		});
 	});
 
-	$("#refresh-message").click(updateMessages());
 
 
 	$("#add-peer").click(function(){
@@ -117,9 +121,6 @@ $(document).ready(function(){
 			data:peer,
 		});
 	});
-
-
-	$("#refresh-peer").click(updatePeers());
 
 	$("#share-file").click(function(){
 		var name = document.getElementById("file-input").files[0].name;
@@ -192,8 +193,10 @@ $(document).ready(function(){
 				ul.id = "confirmed-name"
 				for(var i = 0; i < list.length; i++){
 					var li = document.createElement("li");
-					li.innerHTML = list[i];
-					ul.appendChild(li);
+					if (list[i].length > 0){
+						li.innerHTML = list[i];
+						ul.appendChild(li);
+					}
 				}
 				var box = document.getElementById("confirmed-name-box");
 				box.innerHTML = "";
