@@ -93,6 +93,14 @@ type TLCMessage struct {
 	Fitness float32
 }
 
+type Cloves struct {
+	Data []byte
+	Key []byte
+	K int
+	Id int
+	Sequence_number int
+}
+
 type TLCAck PrivateMessage
 
 type GossipPacket struct {
@@ -106,4 +114,5 @@ type GossipPacket struct {
 	SearchReply *SearchReply
 	TLCMessage *TLCMessage
 	Ack *TLCAck
+	Clove *Cloves
 }
