@@ -64,7 +64,12 @@ func CombineAndDecrypt(cipherData []*big.Int) (data []byte) {
 	//combine to bytes
 	cipherText := make([]byte, 0)
 	for i := 0; i < len(cipherData) ; i++ {
-		cipherText = append(cipherText, cipherData[i].Bytes()...)
+		int_bytes := cipherData[i].Bytes()
+		if len(int_bytes) % SIZE != 0 {
+			padding := make([]byte,SIZE - (len(int_bytes) % SIZE))
+			int_bytes = append(padding,int_bytes...)
+		}
+		cipherText = append(cipherText, int_bytes...)
 	}
 
 	//decrypt

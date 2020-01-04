@@ -1,5 +1,5 @@
 package utils
-import ("math/big")
+// import ("math/big")
 
 type Message struct {
 	Text string
@@ -94,12 +94,6 @@ type TLCMessage struct {
 	Fitness float32
 }
 
-type Cloves struct {
-	Data []byte
-	K int
-	Id *big.Int
-	Sequence_number int
-}
 
 type TLCAck PrivateMessage
 
@@ -114,5 +108,4 @@ type GossipPacket struct {
 	SearchReply *SearchReply
 	TLCMessage *TLCMessage
 	Ack *TLCAck
-	Clove *Cloves
 }

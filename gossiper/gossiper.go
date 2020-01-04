@@ -74,7 +74,7 @@ type Gossiper struct {
 	fileSearcher *FileSearcher
 
 	//clovestorage
-	secretSharer *SecretSharer
+	//secretSharer *SecretSharer
 
 	//constant value
 	hopLimit uint32
@@ -189,7 +189,7 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		hw3ex3 : hw3ex3,
 		hw3ex4 : hw3ex4,
 		consensus : NewConsensus(),
-		secretSharer : NewSecretSharer(),
+		//secretSharer : NewSecretSharer(),
 	}
 }
 //================================
@@ -608,10 +608,10 @@ func (g *Gossiper) dumpBlockChain() []string {
 //SecretSharer
 //==============================
 
-func (g *Gossiper) addClove(clove *utils.Cloves) {
-	g.secretSharer.cloves[clove.Id] = append(g.secretSharer.cloves[clove.Id], clove)
-	go g.secretSharer.checkSecret(clove.Id)
-}
+// func (g *Gossiper) addClove(clove *utils.Cloves) {
+// 	g.secretSharer.cloves[clove.Id] = append(g.secretSharer.cloves[clove.Id], clove)
+// 	go g.secretSharer.checkSecret(clove.Id)
+// }
 
 //================================
 //NO CATEGORY

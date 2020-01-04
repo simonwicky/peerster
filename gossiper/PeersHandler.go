@@ -46,8 +46,8 @@ func (g *Gossiper) PeersHandle(simple bool){
 						g.peerTLCMessageHandler(&packet, address.String())
 					case packet.Ack != nil :
 						g.peerTLCAckHandler(&packet)
-					case packet.Clove != nil :
-						g.peerCloveHandler(&packet)
+					//case packet.Clove != nil :
+						//g.peerCloveHandler(&packet)
 					default:
 						fmt.Fprintln(os.Stderr,"Message unknown, dropping packet")
 				}
@@ -183,9 +183,9 @@ func (g *Gossiper) peerTLCAckHandler(packet *utils.GossipPacket){
 
 }
 
-func (g *Gossiper) peerCloveHandler(packet *utils.GossipPacket){
-	fmt.Fprintln(os.Stderr,"Clove received")
-	clove := packet.Clove
-	g.addClove(clove)
-}
+// func (g *Gossiper) peerCloveHandler(packet *utils.GossipPacket){
+// 	fmt.Fprintln(os.Stderr,"Clove received")
+// 	clove := packet.Clove
+// 	g.addClove(clove)
+// }
 
