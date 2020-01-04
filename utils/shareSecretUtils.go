@@ -4,6 +4,7 @@ import ("crypto/cipher"
 		"math/big"
 		"crypto/rand"
 		"crypto/aes"
+		_ "fmt"
 )
 
 const (
@@ -16,8 +17,8 @@ const (
 
 //taken from https://play.golang.org/p/ssET5KZQuj
 func Random() *big.Int {
-	max := new(big.Int)
-	max.Exp(big.NewInt(2), big.NewInt(130), nil).Sub(max, big.NewInt(1))
+	max,_ := big.NewInt(0).SetString(PRIME,10)
+	max.Sub(max, big.NewInt(1))
 	n, _ := rand.Int(rand.Reader, max)
 	return n
 }
@@ -25,10 +26,12 @@ func Random() *big.Int {
 
 func EncryptAndSplit(data []byte) (cipherData []*big.Int) {
 		//pad
-		if len(data) % SIZE != 0 {
-			padding := make([]byte,SIZE - (len(data) % SIZE))
-			data = append(padding,data...)
+		pad_size := SIZE - (len(data) % SIZE)
+		padding := make([]byte,pad_size)
+		for i := 0; i < pad_size; i++ {
+			padding[i] = byte(pad_size)
 		}
+		data = append(padding,data...)
 
 		//gen key
 	    key_bytes := make([]byte, SIZE)
@@ -74,33 +77,36 @@ func CombineAndDecrypt(cipherData []*big.Int) (data []byte) {
 
 	//decrypt
 	key_bytes := key.Bytes()
+	if len(key_bytes) != SIZE {
+			padding := make([]byte,SIZE - (len(key_bytes) % SIZE))
+			key_bytes = append(padding,key_bytes...)
+	}
 	c,_ := aes.NewCipher(key_bytes)
 	cbc := cipher.NewCBCDecrypter(c,[]byte(AES_IV))
 	data = make([]byte, len(cipherText))
 	cbc.CryptBlocks(data, cipherText)
 
 	//remove padding
-	for data[0] == '\x00' {
-		data = data[1:]
-	}
+	pad_size := int(data[0])
+	data = data[pad_size:]
 
 	return
 }
 
 //polynomial [a,b,c,d] is a + bx + cx^2 + dx^3
-func EvaluatePolynomial(polynomial []*big.Int, x int) (y *big.Int) {
+func EvaluatePolynomial(polynomial []*big.Int, x int) (*big.Int) {
 	prime,_ :=big.NewInt(0).SetString(PRIME,10)
 	x_big := big.NewInt(int64(x))
-	for i := len(polynomial) - 1; i < 0; i-- {
+	y := big.NewInt(0)
+	for i := len(polynomial) - 1; i > 0; i-- {
 		y = y.Add(y,polynomial[i])
 		y = y.Mul(y,x_big)
 		//modulo prime of 128 bits, to keep it 128 bits
 		y = y.Mod(y,prime)
 	}
-
 	y = y.Add(y,polynomial[0])
 	y = y.Mod(y,prime)
-	return
+	return y
 }
 
 func ModInverse(n *big.Int) *big.Int {
