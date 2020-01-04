@@ -1,4 +1,5 @@
 package utils
+import ("math/big")
 
 type Message struct {
 	Text string
@@ -95,9 +96,8 @@ type TLCMessage struct {
 
 type Cloves struct {
 	Data []byte
-	Key []byte
 	K int
-	Id int
+	Id *big.Int
 	Sequence_number int
 }
 

@@ -63,3 +63,4 @@ func (b *BlockPublish) Hash() (out [32]byte) {
 	copy(out[:], h.Sum(nil))
 	return
 }
+
