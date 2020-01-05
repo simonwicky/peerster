@@ -58,9 +58,9 @@ import (
 // 	s.recoverSecret(array)
 // }
 
-func recoverSecret(data [][]byte, pointX []int) {
+func recoverSecret(data [][]byte, pointX []int) []byte{
 	var result_data []*big.Int
-	var points map[int]*big.Int
+	points := make(map[int]*big.Int)
 
 	for i := 0; i < len(data[0]) / utils.SIZE; i++ {
 		for j := 0; j < len(pointX); j++{
@@ -69,9 +69,8 @@ func recoverSecret(data [][]byte, pointX []int) {
 		//recover part i of secret using lagrange polynomial
 		result_data = append(result_data, utils.ComputeLagrange(points))
 	}
-
 	plain_data := utils.CombineAndDecrypt(result_data)
-	_ = plain_data
+	return plain_data
 	//direct data to proxy/content/whatever
 }
 
@@ -90,7 +89,6 @@ func splitSecret(data []byte, threshold int, n int) [][]byte {
 
 	data_split := utils.EncryptAndSplit(data)
 	nb_blocks := len(data_split)
-
 	//generating polynomials
 
 	//array of polynomial coefficient, one for each secret parts
@@ -109,11 +107,16 @@ func splitSecret(data []byte, threshold int, n int) [][]byte {
 	//computing secret shares
 
 	for i := 1; i <= n ; i++ {
+		tmp := make([]byte,0)
 		for j := 0; j < len(data_split) ; j++ {
 			poly := polynomials[j]
-			y := utils.EvaluatePolynomial(poly,i)
-			result = append(result,y.Bytes())
+			y_bytes := utils.EvaluatePolynomial(poly,i).Bytes()
+
+			y_bytes = utils.PadBigInt(y_bytes)
+
+			tmp = append(tmp,y_bytes...)
 		}
+		result = append(result,tmp)
 	}
 
 
