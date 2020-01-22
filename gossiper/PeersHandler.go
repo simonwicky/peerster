@@ -1,58 +1,59 @@
 package gossiper
 
-import ("fmt"
-		"os"
-		"github.com/dedis/protobuf"
-		"github.com/simonwicky/Peerster/utils"
-)
+import (
+	"fmt"
+	"os"
 
+	"github.com/simonwicky/Peerster/utils"
+	"go.dedis.ch/protobuf"
+)
 
 //================================================================
 //PEER SIDE
 //================================================================
 
 //loop handling the peer side
-func (g *Gossiper) PeersHandle(simple bool){
-		fmt.Fprintln(os.Stderr,"Listening on " + g.addressPeer.String())
-		var packetBytes []byte = make([]byte, 10000)
-		for {
-			var packet utils.GossipPacket
-			n,address,err := g.connPeer.ReadFromUDP(packetBytes)
+func (g *Gossiper) PeersHandle(simple bool) {
+	fmt.Fprintln(os.Stderr, "Listening on "+g.addressPeer.String())
+	var packetBytes []byte = make([]byte, 10000)
+	for {
+		var packet utils.GossipPacket
+		n, address, err := g.connPeer.ReadFromUDP(packetBytes)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "Error!")
+			return
+		}
+		if n > 0 {
+			err = protobuf.Decode(packetBytes[:n], &packet)
 			if err != nil {
-				fmt.Fprintln(os.Stderr,"Error!")
-				return
+				fmt.Fprintln(os.Stderr, err.Error())
 			}
-			if n > 0 {
-				err = protobuf.Decode(packetBytes[:n], &packet)
-				if err != nil {
-					fmt.Fprintln(os.Stderr,err.Error())
-				}
-				switch {
-					case simple:
-						g.peerSimpleMessageHandler(&packet)
-					case packet.Private != nil :
-						g.peerPrivateMessageHandler(&packet)
-					case packet.DataRequest != nil :
-						g.peerDataRequestHandler(&packet)
-					case packet.DataReply != nil :
-						g.peerDataReplyHandler(&packet)
-					case packet.SearchRequest != nil :
-						g.peerSearchRequestHandler(&packet)
-					case packet.SearchReply != nil :
-						g.peerSearchReplyHandler(&packet)
-					case packet.Rumor != nil || packet.Status != nil :
-						g.peerRumorStatusHandler(&packet,address.String())
-					case packet.TLCMessage != nil :
-						g.peerTLCMessageHandler(&packet, address.String())
-					case packet.Ack != nil :
-						g.peerTLCAckHandler(&packet)
-					//case packet.Clove != nil :
-						//g.peerCloveHandler(&packet)
-					default:
-						fmt.Fprintln(os.Stderr,"Message unknown, dropping packet")
-				}
+			switch {
+			case simple:
+				g.peerSimpleMessageHandler(&packet)
+			case packet.Private != nil:
+				g.peerPrivateMessageHandler(&packet)
+			case packet.DataRequest != nil:
+				g.peerDataRequestHandler(&packet)
+			case packet.DataReply != nil:
+				g.peerDataReplyHandler(&packet)
+			case packet.SearchRequest != nil:
+				g.peerSearchRequestHandler(&packet)
+			case packet.SearchReply != nil:
+				g.peerSearchReplyHandler(&packet)
+			case packet.Rumor != nil || packet.Status != nil:
+				g.peerRumorStatusHandler(&packet, address.String())
+			case packet.TLCMessage != nil:
+				g.peerTLCMessageHandler(&packet, address.String())
+			case packet.Ack != nil:
+				g.peerTLCAckHandler(&packet)
+			//case packet.Clove != nil :
+			//g.peerCloveHandler(&packet)
+			default:
+				fmt.Fprintln(os.Stderr, "Message unknown, dropping packet")
 			}
 		}
+	}
 }
 
 func (g *Gossiper) peerSimpleMessageHandler(packet *utils.GossipPacket) {
@@ -65,8 +66,8 @@ func (g *Gossiper) peerSimpleMessageHandler(packet *utils.GossipPacket) {
 	g.sendToKnownPeers(relayPeer, packet)
 }
 
-func (g *Gossiper) peerRumorStatusHandler(packet *utils.GossipPacket, address string){
-	fmt.Fprintln(os.Stderr,"Rumor or Status received")
+func (g *Gossiper) peerRumorStatusHandler(packet *utils.GossipPacket, address string) {
+	fmt.Fprintln(os.Stderr, "Rumor or Status received")
 	if worker, ok := g.lookupWorkers(address); ok {
 		worker.Buffer <- *utils.CopyGossipPacket(packet)
 	} else {
@@ -75,8 +76,8 @@ func (g *Gossiper) peerRumorStatusHandler(packet *utils.GossipPacket, address st
 	}
 }
 
-func (g *Gossiper) peerPrivateMessageHandler(packet *utils.GossipPacket){
-	fmt.Fprintln(os.Stderr,"PrivateMessage received")
+func (g *Gossiper) peerPrivateMessageHandler(packet *utils.GossipPacket) {
+	fmt.Fprintln(os.Stderr, "PrivateMessage received")
 	pm := packet.Private
 	if pm.Destination == g.Name {
 		utils.LogPrivate(pm)
@@ -86,8 +87,8 @@ func (g *Gossiper) peerPrivateMessageHandler(packet *utils.GossipPacket){
 
 }
 
-func (g *Gossiper) peerDataRequestHandler(packet *utils.GossipPacket){
-	fmt.Fprintln(os.Stderr,"DataRequest received")
+func (g *Gossiper) peerDataRequestHandler(packet *utils.GossipPacket) {
+	fmt.Fprintln(os.Stderr, "DataRequest received")
 	request := packet.DataRequest
 	if request.Destination != g.Name {
 		g.sendPointToPoint(packet, request.Destination)
@@ -96,8 +97,8 @@ func (g *Gossiper) peerDataRequestHandler(packet *utils.GossipPacket){
 	go g.replyData(packet.DataRequest)
 }
 
-func (g *Gossiper) peerDataReplyHandler(packet *utils.GossipPacket){
-	fmt.Fprintln(os.Stderr,"DataReply received")
+func (g *Gossiper) peerDataReplyHandler(packet *utils.GossipPacket) {
+	fmt.Fprintln(os.Stderr, "DataReply received")
 	reply := packet.DataReply
 	if reply.Destination != g.Name {
 		g.sendPointToPoint(packet, reply.Destination)
@@ -105,24 +106,24 @@ func (g *Gossiper) peerDataReplyHandler(packet *utils.GossipPacket){
 	}
 	dd := g.lookupDownloader(reply.HashValue)
 	if dd == nil {
-		fmt.Fprintln(os.Stderr,"Didn't found the corresponding downloader")
+		fmt.Fprintln(os.Stderr, "Didn't found the corresponding downloader")
 		return
 	}
 	dd.replies <- reply
 }
 
-func (g *Gossiper) peerSearchRequestHandler(packet *utils.GossipPacket){
-	fmt.Fprintln(os.Stderr,"SearchRequest received")
+func (g *Gossiper) peerSearchRequestHandler(packet *utils.GossipPacket) {
+	fmt.Fprintln(os.Stderr, "SearchRequest received")
 	request := packet.SearchRequest
-	if (!g.lookupSearchRequest(request.Origin,request.Keywords)) {
+	if !g.lookupSearchRequest(request.Origin, request.Keywords) {
 		go g.NewSearchReplier(request)
 		return
 	}
-	fmt.Fprintln(os.Stderr,"Duplicate SearchRequest received")
+	fmt.Fprintln(os.Stderr, "Duplicate SearchRequest received")
 }
 
-func (g *Gossiper) peerSearchReplyHandler(packet *utils.GossipPacket){
-	fmt.Fprintln(os.Stderr,"SearchReply received")
+func (g *Gossiper) peerSearchReplyHandler(packet *utils.GossipPacket) {
+	fmt.Fprintln(os.Stderr, "SearchReply received")
 	reply := packet.SearchReply
 	if reply.Destination != g.Name {
 		g.sendPointToPoint(packet, reply.Destination)
@@ -132,12 +133,12 @@ func (g *Gossiper) peerSearchReplyHandler(packet *utils.GossipPacket){
 	if searcher.running {
 		searcher.replies <- reply
 	} else {
-		fmt.Fprintln(os.Stderr,"Search not in progress")
+		fmt.Fprintln(os.Stderr, "Search not in progress")
 	}
 }
 
-func (g *Gossiper) peerTLCMessageHandler(packet *utils.GossipPacket, address string){
-	fmt.Fprintln(os.Stderr,"TLCMessage received")
+func (g *Gossiper) peerTLCMessageHandler(packet *utils.GossipPacket, address string) {
+	fmt.Fprintln(os.Stderr, "TLCMessage received")
 	//ultimately send it to the rumormonger
 	defer g.peerRumorStatusHandler(packet, address)
 	msg := packet.TLCMessage
@@ -154,28 +155,28 @@ func (g *Gossiper) peerTLCMessageHandler(packet *utils.GossipPacket, address str
 			return
 		}
 		publisher := g.checkPublisher(uint32(msg.Confirmed))
-		if (publisher != nil) {
+		if publisher != nil {
 			publisher.msg <- msg
 		}
 		return
 	}
-	if g.checkBlockValidity(&msg.TxBlock){
+	if g.checkBlockValidity(&msg.TxBlock) {
 		g.tlcStorage.addMessage(msg)
 		g.TLCAck(packet)
 	} else {
-		fmt.Fprintln(os.Stderr,"mapping already exists")
+		fmt.Fprintln(os.Stderr, "mapping already exists")
 		//don't ack the message, for now nothing
 	}
 }
 
-func (g *Gossiper) peerTLCAckHandler(packet *utils.GossipPacket){
-	fmt.Fprintln(os.Stderr,"TLCACK received")
+func (g *Gossiper) peerTLCAckHandler(packet *utils.GossipPacket) {
+	fmt.Fprintln(os.Stderr, "TLCACK received")
 	ack := packet.Ack
 	if ack.Destination == g.Name {
 		if p := g.lookupPublisher(ack.ID); p != nil {
 			p.acks <- ack
 		} else {
-			fmt.Fprintln(os.Stderr,"Publisher not found, dropping packet")
+			fmt.Fprintln(os.Stderr, "Publisher not found, dropping packet")
 		}
 		return
 	}
@@ -188,4 +189,3 @@ func (g *Gossiper) peerTLCAckHandler(packet *utils.GossipPacket){
 // 	clove := packet.Clove
 // 	g.addClove(clove)
 // }
-
