@@ -15,6 +15,11 @@ import (
 	"go.dedis.ch/protobuf"
 )
 
+type Settings struct {
+	SessionKeySize uint
+	Buffering      uint
+}
+
 type Gossiper struct {
 	//network
 	addressPeer   *net.UDPAddr
@@ -88,6 +93,11 @@ type Gossiper struct {
 	//blockChain
 	blockChain []*utils.BlockPublish
 	consensus  *Consensus
+
+	//cloves
+	cloves     map[string]map[string]map[uint8]*utils.Clove
+	newProxies chan *Proxy
+	settings   *Settings
 }
 
 func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer, hoplimit, peersNumber, stubbornTimeout int, hw3ex2, hw3ex3, hw3ex4 bool) *Gossiper {
@@ -156,6 +166,7 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 	}
 
 	if peersNumber == 0 {
+		fmt.Println(peers)
 		fmt.Fprintln(os.Stderr, "Number of peers should be > 0")
 		return nil
 	}
@@ -193,15 +204,71 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 	}
 }
 
-func initiator(period time.Duration, peersAtBootstrap []string, peersUpdates chan []string) {
+/*type Proxy struct {
+	Paths     [2]*net.UDPAddr
+	PublicKey crypto.PublicKey
+}*/
+
+func getTuple(n uint, paths map[string]bool, peers []string) ([]string, map[string]bool, error) {
+	//shuffle known peers
+	tuple := make([]string, n)
+	var i uint = 0
+	for _, peer := range peers {
+		if _, ok := paths[peer]; !ok {
+			tuple[i] = peer
+			i++
+			delete(paths, peer)
+			if i >= n {
+				return tuple, paths, nil
+			}
+		}
+	}
+	return tuple[:i], paths, fmt.Errorf("Not enough available paths!")
+}
+
+/*
+Proxy describes a proxy in an abstract manner
+*/
+type Proxy struct {
+	Paths      [2]string
+	SessionKey []byte
+	ProxySN    []byte
+}
+
+/*
+BIG QUESTION: is it enough to take distincts pairs or do _ALL_ the paths have to be distinct
+	- distinct pairs:
+	- distinct paths:
+
+	let's assume distinct paths(one path = one and only one proxy)
+*/
+func (g *Gossiper) initiator(n uint, period time.Duration, peersAtBootstrap []string, peersUpdates chan []string) {
 	knownPeers := peersAtBootstrap
+	paths := map[string]bool{}
+	proxies := make([]*Proxy, 0)
 	for {
 		select {
 		case <-time.After(time.Second * period):
 			//initiate proxy search
-
+			utils.Log("Looking for new proxies...")
+			tuple, pathsStillAvailable, err := getTuple(n, paths, knownPeers)
+			paths = pathsStillAvailable
+			if err == nil {
+				cloves := utils.NewProxyInit().Split(2, n)
+				for i, clove := range cloves {
+					g.sendToPeer(tuple[i], clove.Wrap())
+				}
+			}
 		case peersUpdate := <-peersUpdates:
 			knownPeers = peersUpdate
+		case newProxy := <-g.newProxies:
+			proxies = append(proxies, newProxy)
+			sessionKey := make([]byte, g.settings.SessionKeySize)
+			rand.Read(sessionKey) // always return nil error per documentation
+			cloves := utils.NewProxyAck(sessionKey).Split(2, 2)
+			for i, clove := range cloves {
+				g.sendToPeer(newProxy.Paths[i], clove.Wrap())
+			}
 		}
 	}
 }
@@ -216,6 +283,7 @@ func (g *Gossiper) Start(simple bool, port string) {
 	}
 	go g.rumorRoute()
 	go g.HttpServerHandler(port)
+	go g.initiator(3, 10, g.knownPeers, nil)
 	g.PeersHandle(simple)
 }
 

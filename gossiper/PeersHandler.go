@@ -2,6 +2,7 @@ package gossiper
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 
 	"github.com/simonwicky/Peerster/utils"
@@ -47,15 +48,70 @@ func (g *Gossiper) PeersHandle(simple bool) {
 				g.peerTLCMessageHandler(&packet, address.String())
 			case packet.Ack != nil:
 				g.peerTLCAckHandler(&packet)
-			//case packet.Clove != nil :
-			//g.peerCloveHandler(&packet)
+			case packet.Clove != nil:
+				g.cloveHandler(packet.Clove, address.String())
 			default:
 				fmt.Fprintln(os.Stderr, "Message unknown, dropping packet")
 			}
 		}
 	}
 }
-
+func (g *Gossiper) cloveHandler(clove *utils.Clove, predecessor string) {
+	var sequenceNumber string
+	//store clove by sequence number
+	if _, ok := g.cloves[sequenceNumber]; !ok {
+		g.cloves[sequenceNumber] = make(map[string]map[uint8]*utils.Clove)
+	}
+	if _, ok := g.cloves[sequenceNumber][predecessor]; !ok {
+		g.cloves[sequenceNumber][predecessor] = make(map[uint8]*utils.Clove)
+	}
+	full := false
+	if _, ok := g.cloves[sequenceNumber][predecessor][clove.Index]; !ok {
+		g.cloves[sequenceNumber][predecessor][clove.Index] = clove
+		if len(g.cloves[sequenceNumber][predecessor]) >= int(clove.Threshold) {
+			//flip a coin?
+			//clove can be reconstituted, call recover and handle type
+			full = true
+			//reconstitute chain of bytes
+			cloves := make([]*utils.Clove, 0)
+			paths := [2]string{"", ""}
+			for _, collected := range g.cloves[sequenceNumber][predecessor] {
+				cloves = append(cloves, collected)
+			}
+			i := 0
+			for path := range g.cloves[sequenceNumber] {
+				paths[i] = path
+				i++
+			}
+			df := utils.NewDataFragment(cloves[:clove.Threshold])
+			switch {
+			case df.Proxy != nil:
+				if df.Proxy.Forward {
+					if df.Proxy.SessionKey == nil {
+						cloves := utils.NewProxyAccept().Split(2, 2)
+						//accept to be a proxy
+						for i, path := range paths {
+							g.sendToPeer(path, cloves[i].Wrap())
+						}
+					} else {
+						// register session key
+					}
+				} else {
+					// record proxy and send session key
+					g.newProxies <- &Proxy{Paths: paths}
+				}
+			default:
+				utils.Log("unimplemented type of data fragment")
+			}
+		}
+	}
+	p := 0.2
+	if !full {
+		if rand.Float64() < p {
+			//forward to one random neighbour
+		}
+	}
+}
 func (g *Gossiper) peerSimpleMessageHandler(packet *utils.GossipPacket) {
 
 	utils.LogSimpleMessage(packet.Simple)

@@ -1,14 +1,16 @@
 package utils
 
-import ("fmt"
-		"strings"
-		"encoding/hex")
+import (
+	"encoding/hex"
+	"fmt"
+	"strings"
+)
 
-func LogRumor(packet *RumorMessage, address string){
-	fmt.Printf("RUMOR origin %s from %s ID %d contents %s\n",packet.Origin,address,packet.ID,packet.Text)
+func LogRumor(packet *RumorMessage, address string) {
+	fmt.Printf("RUMOR origin %s from %s ID %d contents %s\n", packet.Origin, address, packet.ID, packet.Text)
 }
 
-func LogStatus(want []PeerStatus, address string){
+func LogStatus(want []PeerStatus, address string) {
 	fmt.Printf("STATUS from %s ", address)
 	for _, status := range want {
 		fmt.Printf("peer %s nextID %d ", status.Identifer, status.NextID)
@@ -16,57 +18,57 @@ func LogStatus(want []PeerStatus, address string){
 	fmt.Printf("\n")
 }
 
-func LogSimpleMessage(packet *SimpleMessage){
-	fmt.Printf("SIMPLE MESSAGE origin %s from %s contents %s\n",packet.OriginalName, packet.RelayPeerAddr, packet.Contents)
+func LogSimpleMessage(packet *SimpleMessage) {
+	fmt.Printf("SIMPLE MESSAGE origin %s from %s contents %s\n", packet.OriginalName, packet.RelayPeerAddr, packet.Contents)
 }
 
-func LogPeers(peers []string){
-	fmt.Printf("PEERS %s\n", strings.Join(peers,","))
+func LogPeers(peers []string) {
+	fmt.Printf("PEERS %s\n", strings.Join(peers, ","))
 }
 
-func LogSync(address string){
-	fmt.Printf("IN SYNC WITH %s\n",address)
+func LogSync(address string) {
+	fmt.Printf("IN SYNC WITH %s\n", address)
 }
 
-func LogFlip(address string){
-	fmt.Printf("FLIPPED COIN sending rumor to %s\n",address)
+func LogFlip(address string) {
+	fmt.Printf("FLIPPED COIN sending rumor to %s\n", address)
 }
 
-func LogMongering(address string){
-	fmt.Printf("MONGERING with %s\n",address)
+func LogMongering(address string) {
+	fmt.Printf("MONGERING with %s\n", address)
 }
 
-func LogDSDV(name, address string){
-	fmt.Printf("DSDV %s %s\n",name,address)
+func LogDSDV(name, address string) {
+	fmt.Printf("DSDV %s %s\n", name, address)
 }
 
-func LogPrivate(packet *PrivateMessage){
-	fmt.Printf("PRIVATE origin %s hop-limit %d contents %s\n",packet.Origin,packet.HopLimit,packet.Text)
+func LogPrivate(packet *PrivateMessage) {
+	fmt.Printf("PRIVATE origin %s hop-limit %d contents %s\n", packet.Origin, packet.HopLimit, packet.Text)
 }
 
-func LogClient(text string){
-	fmt.Printf("CLIENT MESSAGE %s\n",text)
+func LogClient(text string) {
+	fmt.Printf("CLIENT MESSAGE %s\n", text)
 }
 
-func LogMetafile(filename, peer string){
-	fmt.Printf("DOWNLOADING metafile of %s from %s\n",filename,peer)
+func LogMetafile(filename, peer string) {
+	fmt.Printf("DOWNLOADING metafile of %s from %s\n", filename, peer)
 }
 
-func LogChunk(filename, peer string, index int){
-	fmt.Printf("DOWNLOADING %s chunk %d from %s\n",filename,index,peer)
+func LogChunk(filename, peer string, index int) {
+	fmt.Printf("DOWNLOADING %s chunk %d from %s\n", filename, index, peer)
 }
 
 func LogReconstruct(filename string) {
-	fmt.Printf("RECONSTRUCTED file %s\n",filename)
+	fmt.Printf("RECONSTRUCTED file %s\n", filename)
 }
-func LogSearchFinished(){
-	fmt.Printf("SEARCH FINISHED\n");
+func LogSearchFinished() {
+	fmt.Printf("SEARCH FINISHED\n")
 }
-func LogFileFound(name, peer, metafile string, chunkMap []uint64){
-	fmt.Printf("FOUND match %s at %s\n",name,peer)
-	fmt.Printf("metafile=%s chunks=",metafile)
-	for index,n := range chunkMap {
-		fmt.Printf("%d",n)
+func LogFileFound(name, peer, metafile string, chunkMap []uint64) {
+	fmt.Printf("FOUND match %s at %s\n", name, peer)
+	fmt.Printf("metafile=%s chunks=", metafile)
+	for index, n := range chunkMap {
+		fmt.Printf("%d", n)
 		if index != len(chunkMap)-1 {
 			fmt.Printf(",")
 		}
@@ -75,27 +77,27 @@ func LogFileFound(name, peer, metafile string, chunkMap []uint64){
 
 }
 
-func LogTLCGossip(message *TLCMessage){
-	if message.Confirmed != -1{
+func LogTLCGossip(message *TLCMessage) {
+	if message.Confirmed != -1 {
 		fmt.Printf("CONFIRMED ")
 	} else {
 		fmt.Printf("UNCONFIRMED ")
 	}
-	fmt.Printf("GOSSIP origin %s ID %d file name %s size %d metahash %s\n",message.Origin, message.ID, message.TxBlock.Transaction.Name,message.TxBlock.Transaction.Size,hex.EncodeToString(message.TxBlock.Transaction.MetafileHash))
+	fmt.Printf("GOSSIP origin %s ID %d file name %s size %d metahash %s\n", message.Origin, message.ID, message.TxBlock.Transaction.Name, message.TxBlock.Transaction.Size, hex.EncodeToString(message.TxBlock.Transaction.MetafileHash))
 }
 
-func LogConfirmedID(id uint32, witnesses []string){
+func LogConfirmedID(id uint32, witnesses []string) {
 	fmt.Printf("RE-BROADCAST ID %d WITNESSES %s\n", id, strings.Join(witnesses, ","))
 }
 
-func LogAck(origin string, id uint32){
-	fmt.Printf("SENDING ACK origin %s ID %d\n", origin,id)
+func LogAck(origin string, id uint32) {
+	fmt.Printf("SENDING ACK origin %s ID %d\n", origin, id)
 }
 
-func LogNextRound(id uint32,msgs []*TLCMessage){
-	fmt.Printf("ADVANCING TO round ​%d BASED ON CONFIRMED MESSAGES ",id)
-	for index,msg := range msgs {
-		fmt.Printf("origin%d %s ID%d %d",index+1,msg.Origin, index+1, msg.ID)
+func LogNextRound(id uint32, msgs []*TLCMessage) {
+	fmt.Printf("ADVANCING TO round ​%d BASED ON CONFIRMED MESSAGES ", id)
+	for index, msg := range msgs {
+		fmt.Printf("origin%d %s ID%d %d", index+1, msg.Origin, index+1, msg.ID)
 		if index != len(msgs)-1 {
 			fmt.Printf(", ")
 		}
@@ -103,10 +105,16 @@ func LogNextRound(id uint32,msgs []*TLCMessage){
 	fmt.Printf("\n")
 }
 
-func LogConsensus(id uint32,msg *TLCMessage,nameList []string){
-	fmt.Printf("CONSENSUS ON QSC round %d message origin %s ID %d ​",id,msg.Origin,msg.ID)
+func LogConsensus(id uint32, msg *TLCMessage, nameList []string) {
+	fmt.Printf("CONSENSUS ON QSC round %d message origin %s ID %d ​", id, msg.Origin, msg.ID)
 	fmt.Printf("file names ")
 	fmt.Printf(strings.Join(nameList, " "))
 	fmt.Printf(" size %d metahash %s\n", msg.TxBlock.Transaction.Size, hex.EncodeToString(msg.TxBlock.Transaction.MetafileHash))
 }
 
+/*
+Log prints messages to the std output prepended by a [DEBUG] flag
+*/
+func Log(msg ...interface{}) {
+	fmt.Println("[\033[0;36mDEBUG\033[0m]", fmt.Sprint(msg...))
+}

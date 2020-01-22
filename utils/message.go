@@ -131,6 +131,27 @@ type DataFragment struct {
 	Content *Content
 }
 
+/*
+NewDataFragment returns a DataFragment recovered from k cloves
+*/
+func NewDataFragment(cloves []*Clove) *DataFragment {
+	threshold := cloves[0].Threshold
+	xs := make([]int, threshold)
+	data := make([][]byte, threshold)
+	for i, clove := range cloves {
+		xs[i] = int(clove.Index)
+		data[i] = clove.Data
+	}
+	marshalled := recoverSecret(data, xs)
+	var df *DataFragment
+	err := protobuf.Decode(marshalled, df)
+	if err != nil {
+		Log(err.Error())
+		return nil
+	}
+	return df
+}
+
 func NewProxyInit() *DataFragment {
 	return &DataFragment{Proxy: &ProxyRequest{Forward: true}}
 }
