@@ -87,6 +87,10 @@ type Gossiper struct {
 	//blockChain
 	blockChain []*utils.BlockPublish
 	consensus *Consensus
+
+	//Freenet routing mapping filenames to neighbors
+	FilesRouting *FilesRouting
+	GCFileSearcher *GCFileSearcher
 }
 
 
@@ -515,13 +519,20 @@ func (g *Gossiper) removeSearchReplier(sr *SearchReplier){
 //================================
 //File Searcher
 //================================
+
+//TODO: Remove redundancy
 func (g *Gossiper) getFileSearcher() *FileSearcher {
 	if g.fileSearcher == nil {
 		g.fileSearcher = NewFileSearcher(g)
 	}
 	return g.fileSearcher
 }
-
+func (g *Gossiper) getGCFileSearcher() *GCFileSearcher {
+	if g.GCFileSearcher == nil {
+		g.GCFileSearcher = NewGCFileSearcher(g)
+	}
+	return g.GCFileSearcher
+}
 func (g *Gossiper) deleteFileSearcher() {
 	g.fileSearcher = nil
 }

@@ -40,6 +40,10 @@ func (g *Gossiper) PeersHandle(simple bool){
 						g.peerSearchRequestHandler(&packet)
 					case packet.SearchReply != nil :
 						g.peerSearchReplyHandler(&packet)
+					case packet.GCSearchRequest != nil:
+						g.peerGCSearchRequestHandler(&packet)
+					case packet.GCSearchReply != nil:
+						g.peerGCSearchReplyHandler(&packet)
 					case packet.Rumor != nil || packet.Status != nil :
 						g.peerRumorStatusHandler(&packet,address.String())
 					case packet.TLCMessage != nil :
@@ -182,6 +186,15 @@ func (g *Gossiper) peerTLCAckHandler(packet *utils.GossipPacket){
 	go g.sendPointToPoint(packet, ack.Destination)
 
 }
+
+func (g *Gossiper) peerGCSearchRequestHandler(packet *utils.GossipPacket){
+
+}
+
+func (g *Gossiper) peerGCSearchReplyHandler(packet *utils.GossipPacket){
+	
+}
+
 
 // func (g *Gossiper) peerCloveHandler(packet *utils.GossipPacket){
 // 	fmt.Fprintln(os.Stderr,"Clove received")

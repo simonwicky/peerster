@@ -105,3 +105,14 @@ func(g *Gossiper) clientFileSearchHandler(message *utils.Message) {
 		fmt.Fprintln(os.Stderr,"File search already running")
 	}
 }
+
+
+func(g *Gossiper) clientGCFileSearchHandler(message *utils.Message) {
+	searcher := g.getGCFileSearcher()
+	if !searcher.running {
+		keywords := strings.Split(*message.Keywords,",")
+		go searcher.Start(keywords)
+	} else {
+		fmt.Fprintln(os.Stderr,"File search already running")
+	}
+}
