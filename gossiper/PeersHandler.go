@@ -15,7 +15,7 @@ import (
 
 //loop handling the peer side
 func (g *Gossiper) PeersHandle(simple bool) {
-	fmt.Fprintln(os.Stderr, "Listening on "+g.addressPeer.String())
+	//fmt.Fprintln(os.Stderr, "Listening on "+g.addressPeer.String())
 	var packetBytes []byte = make([]byte, 10000)
 	for {
 		var packet utils.GossipPacket
@@ -56,30 +56,38 @@ func (g *Gossiper) PeersHandle(simple bool) {
 		}
 	}
 }
+func (g *Gossiper) getRandomPeer(exclude string) *string {
+	if len(g.knownPeers) <= 0 {
+		return nil
+	}
+	peer := g.knownPeers[rand.Intn(len(g.knownPeers))]
+	if peer == exclude {
+		return g.getRandomPeer(exclude)
+	}
+	return &peer
+}
 func (g *Gossiper) cloveHandler(clove *utils.Clove, predecessor string) {
 	var sequenceNumber string
+	logger := utils.LogObj
 	//store clove by sequence number
 	if _, ok := g.cloves[sequenceNumber]; !ok {
-		g.cloves[sequenceNumber] = make(map[string]map[uint8]*utils.Clove)
-	}
-	if _, ok := g.cloves[sequenceNumber][predecessor]; !ok {
-		g.cloves[sequenceNumber][predecessor] = make(map[uint8]*utils.Clove)
+		g.cloves[sequenceNumber] = make(map[string]*utils.Clove)
 	}
 	full := false
-	if _, ok := g.cloves[sequenceNumber][predecessor][clove.Index]; !ok {
-		g.cloves[sequenceNumber][predecessor][clove.Index] = clove
-		if len(g.cloves[sequenceNumber][predecessor]) >= int(clove.Threshold) {
+	if _, ok := g.cloves[sequenceNumber][predecessor]; !ok {
+		g.cloves[sequenceNumber][predecessor] = clove
+		logger.Debug("got", len(g.cloves[sequenceNumber]), "cloves...")
+		if len(g.cloves[sequenceNumber]) >= int(clove.Threshold) {
+			logger.Debug("recovering cloves")
 			//flip a coin?
 			//clove can be reconstituted, call recover and handle type
 			full = true
 			//reconstitute chain of bytes
 			cloves := make([]*utils.Clove, 0)
 			paths := [2]string{"", ""}
-			for _, collected := range g.cloves[sequenceNumber][predecessor] {
-				cloves = append(cloves, collected)
-			}
 			i := 0
-			for path := range g.cloves[sequenceNumber] {
+			for path, collected := range g.cloves[sequenceNumber] {
+				cloves = append(cloves, collected)
 				paths[i] = path
 				i++
 			}
@@ -101,16 +109,26 @@ func (g *Gossiper) cloveHandler(clove *utils.Clove, predecessor string) {
 					g.newProxies <- &Proxy{Paths: paths}
 				}
 			default:
-				utils.Log("unimplemented type of data fragment")
+				logger.Warn("unimplemented type of data fragment")
 			}
 		}
+	} else {
+		logger.Warn("received two cloves from the same predecessor. dropping!")
 	}
-	p := 0.2
+	p := 0.8
 	if !full {
 		if rand.Float64() < p {
+			if successor := g.getRandomPeer(predecessor); successor != nil {
+				logger.Debug("Forwarding clove to ", *successor)
+				g.sendToPeer(*successor, clove.Wrap())
+			}
+
 			//forward to one random neighbour
+		} else {
+			logger.Debug("dropping clove")
 		}
 	}
+	logger.Debug(g.cloves)
 }
 func (g *Gossiper) peerSimpleMessageHandler(packet *utils.GossipPacket) {
 
@@ -123,7 +141,7 @@ func (g *Gossiper) peerSimpleMessageHandler(packet *utils.GossipPacket) {
 }
 
 func (g *Gossiper) peerRumorStatusHandler(packet *utils.GossipPacket, address string) {
-	fmt.Fprintln(os.Stderr, "Rumor or Status received")
+	//fmt.Fprintln(os.Stderr, "Rumor or Status received")
 	if worker, ok := g.lookupWorkers(address); ok {
 		worker.Buffer <- *utils.CopyGossipPacket(packet)
 	} else {

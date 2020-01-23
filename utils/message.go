@@ -105,8 +105,8 @@ type TLCAck PrivateMessage
 Clove is the backbone of secret sharing
 */
 type Clove struct {
-	Index          uint8
-	Threshold      uint8
+	Index          uint32
+	Threshold      uint32
 	SequenceNumber []byte
 	Data           []byte
 }
@@ -135,21 +135,21 @@ type DataFragment struct {
 NewDataFragment returns a DataFragment recovered from k cloves
 */
 func NewDataFragment(cloves []*Clove) *DataFragment {
-	threshold := cloves[0].Threshold
+	threshold := len(cloves) //cloves[0].Threshold
 	xs := make([]int, threshold)
 	data := make([][]byte, threshold)
 	for i, clove := range cloves {
-		xs[i] = int(clove.Index)
+		xs[i] = int(clove.Index) + 1
 		data[i] = clove.Data
 	}
 	marshalled := recoverSecret(data, xs)
-	var df *DataFragment
-	err := protobuf.Decode(marshalled, df)
+	var df DataFragment
+	err := protobuf.Decode(marshalled, &df)
 	if err != nil {
-		Log(err.Error())
+		LogObj.Fatal(err.Error())
 		return nil
 	}
-	return df
+	return &df
 }
 
 func NewProxyInit() *DataFragment {
@@ -182,7 +182,7 @@ func (df *DataFragment) Split(k uint, n uint) []*Clove {
 	secrets := splitSecret(marshal, int(k), int(n))
 	cloves := make([]*Clove, len(secrets))
 	for i, secret := range secrets {
-		cloves[i] = &Clove{Threshold: uint8(k), Index: uint8(i), Data: secret}
+		cloves[i] = &Clove{Threshold: uint32(k), Index: uint32(i), Data: secret}
 	}
 	return cloves
 }

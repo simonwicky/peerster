@@ -94,8 +94,8 @@ type Gossiper struct {
 	blockChain []*utils.BlockPublish
 	consensus  *Consensus
 
-	//cloves
-	cloves     map[string]map[string]map[uint8]*utils.Clove
+	//cloves; can only receive one clove from particular predecessor for a particular sequence number
+	cloves     map[string]map[string]*utils.Clove
 	newProxies chan *Proxy
 	settings   *Settings
 }
@@ -158,7 +158,7 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 	}
 	var rTimerTicker *time.Ticker
 	if rtimer == 0 {
-		fmt.Fprintln(os.Stderr, "Route rumors disabled")
+		//fmt.Fprintln(os.Stderr, "Route rumors disabled")
 		rTimerTicker = nil
 	} else {
 		duration, _ := time.ParseDuration(strconv.Itoa(rtimer) + "s")
@@ -200,6 +200,12 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		hw3ex3:            hw3ex3,
 		hw3ex4:            hw3ex4,
 		consensus:         NewConsensus(),
+		cloves:            make(map[string]map[string]*utils.Clove),
+		settings: &Settings{
+			SessionKeySize: 32,
+			Buffering:      10,
+		},
+		newProxies: make(chan *Proxy),
 		//secretSharer : NewSecretSharer(),
 	}
 }
@@ -236,6 +242,7 @@ type Proxy struct {
 }
 
 /*
+initiator maintains a proxy pool by periodically trying to discover new ones
 BIG QUESTION: is it enough to take distincts pairs or do _ALL_ the paths have to be distinct
 	- distinct pairs:
 	- distinct paths:
@@ -250,7 +257,6 @@ func (g *Gossiper) initiator(n uint, period time.Duration, peersAtBootstrap []st
 		select {
 		case <-time.After(time.Second * period):
 			//initiate proxy search
-			utils.Log("Looking for new proxies...")
 			tuple, pathsStillAvailable, err := getTuple(n, paths, knownPeers)
 			paths = pathsStillAvailable
 			if err == nil {
@@ -296,7 +302,7 @@ func (g *Gossiper) antiEntropy() {
 		g.currentStatus_lock.RLock()
 		g.sendToRandomPeer(&utils.GossipPacket{Status: &g.currentStatus})
 		g.currentStatus_lock.RUnlock()
-		fmt.Fprintln(os.Stderr, "Sending antientropy")
+		//fmt.Fprintln(os.Stderr, "Sending antientropy")
 	}
 }
 
@@ -307,7 +313,7 @@ func (g *Gossiper) rumorRoute() {
 	for {
 		rumor := g.generateRumor("")
 		g.sendToRandomPeer(&utils.GossipPacket{Rumor: &rumor})
-		fmt.Fprintln(os.Stderr, "Sending route rumors.")
+		//fmt.Fprintln(os.Stderr, "Sending route rumors.")
 		_ = <-g.rTimerTicker.C
 	}
 }
@@ -333,7 +339,7 @@ func (g *Gossiper) sendToRandomPeer(packet *utils.GossipPacket) string {
 		g.sendToPeer(nextPeerAddr, packet)
 		return nextPeerAddr
 	} else {
-		fmt.Fprintln(os.Stderr, "No known peers")
+		//fmt.Fprintln(os.Stderr, "No known peers")
 		return ""
 	}
 }
@@ -346,14 +352,14 @@ func (g *Gossiper) sendToPeer(peer string, packet *utils.GossipPacket) {
 	}
 	packetBytes, err := protobuf.Encode(packet)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "Could not serialize packet")
+		fmt.Fprintln(os.Stderr, err.Error())
 		return
 	}
 	n, err := g.connPeer.WriteToUDP(packetBytes, address)
 	if n == 0 {
 		fmt.Fprintln(os.Stderr, err)
 	}
-	fmt.Fprintln(os.Stderr, "Packet sent to "+address.String()+" size: ", n)
+	//fmt.Fprintln(os.Stderr, "Packet sent to "+address.String()+" size: ", n)
 }
 
 func (g *Gossiper) sendPointToPoint(packet *utils.GossipPacket, destination string) {

@@ -15,7 +15,7 @@ import (
 
 //loop handling the client side
 func (g *Gossiper) ClientHandle(simple bool) {
-	fmt.Fprintln(os.Stderr, "Listening on "+g.addressClient.String())
+	//fmt.Fprintln(os.Stderr, "Listening on "+g.addressClient.String())
 	var packetBytes []byte = make([]byte, 1024)
 	for {
 		var message utils.Message
