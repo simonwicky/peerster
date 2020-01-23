@@ -1,6 +1,8 @@
 package utils
 import ("crypto/sha256"
-		"encoding/binary")
+		"encoding/binary"
+		"encoding/hex"
+	)
 
 func ArrayEquals(a []string, b []string) bool {
 	if len(a) != len(b){
@@ -64,3 +66,6 @@ func (b *BlockPublish) Hash() (out [32]byte) {
 	return
 }
 
+func HexToString(hexrepr []byte) string {
+	return hex.EncodeToString(hexrepr)
+}

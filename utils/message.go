@@ -66,6 +66,25 @@ type SearchReply struct {
 	HopLimit uint32
 	Results []*SearchResult
 }
+type GCSearchReply struct {
+	ID uint32
+	Origin string
+	Results []*SearchResult
+	AccessibleFiles []*SearchResult
+}
+type GCSearchRequest struct {
+	ID uint32
+	Origin string
+	Keywords []string
+}
+
+
+
+type GCDownloadRequest struct {
+	ID uint32
+	ProxiesIP []string
+	FileMetaHash []byte
+}
 
 type SearchResult struct {
 	FileName string
@@ -106,6 +125,8 @@ type GossipPacket struct {
 	DataReply *DataReply
 	SearchRequest *SearchRequest
 	SearchReply *SearchReply
+	GCSearchRequest *GCSearchRequest
+	GCSearchReply *GCSearchReply
 	TLCMessage *TLCMessage
 	Ack *TLCAck
 }
