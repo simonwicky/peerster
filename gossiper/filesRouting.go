@@ -4,6 +4,8 @@ import (
 	"sync"
 	"github.com/simonwicky/Peerster/utils"
 )
+
+//Files routing table to keep track of the possible paths to each file
 type FilesRouting struct {
 	sync.Mutex
 	filesRoutes map[string] *FileRoutes
@@ -47,7 +49,10 @@ func (filesRouting *FilesRouting) GetRoutes(metaFileHash string) []string{
 	return routes
 }
 
-
+/*
+	Returns the routes where to send the search request in an optimal order.
+	Routes are sorted on a longest prefix match basis.
+*/
 func (filesRouting *FilesRouting) RoutesSorted(keywords []string) (peers []string ){
 	return nil
 }

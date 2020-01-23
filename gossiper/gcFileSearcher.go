@@ -13,6 +13,7 @@ import (
 
 
 )
+//Worker managing the file search in the Garlic Cast extension
 type GCFileSearcher struct{
 	running bool
 	replies chan *utils.GCSearchReply
@@ -31,11 +32,12 @@ func NewGCFileSearcher(g *Gossiper) *GCFileSearcher {
 	}
 }
 
-func (s *GCFileSearcher) Start(keyword []string){
+//Start the file search given the specified keywords
+func (s *GCFileSearcher) Start(keywords []string){
 	s.running = true
-	s.keywords = keyword
+	s.keywords = keywords
 	s.matches = make([]*Match,0)
-	go s.search(keyword)
+	go s.search(keywords)
 	//s.handleReply()
 	s.running = false
 }
@@ -67,7 +69,10 @@ func contains(haystack []*utils.SearchResult, needle *utils.SearchResult) bool{
 	return false
 }
 
-
+/*
+	Manages the file search. Sends search requests in the appropriate order
+	depending on the gossiper files routing table. 
+*/ 
 func (s *GCFileSearcher) manageRequest(searchRequest *utils.GCSearchRequest){
 	ticker := time.NewTicker(time.Second * time.Duration(5))
 	var receivedResults []*utils.SearchResult
