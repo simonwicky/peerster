@@ -95,7 +95,7 @@ type Gossiper struct {
 	consensus  *Consensus
 
 	//cloves; can only receive one clove from particular predecessor for a particular sequence number
-	cloves     map[string]map[string]*utils.Clove
+	cloves     map[string]map[string]utils.Clove
 	newProxies chan *Proxy
 	settings   *Settings
 }
@@ -200,7 +200,7 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		hw3ex3:            hw3ex3,
 		hw3ex4:            hw3ex4,
 		consensus:         NewConsensus(),
-		cloves:            make(map[string]map[string]*utils.Clove),
+		cloves:            make(map[string]map[string]utils.Clove),
 		settings: &Settings{
 			SessionKeySize: 32,
 			Buffering:      10,
@@ -246,7 +246,10 @@ func (g *Gossiper) initiate(n uint, knownPeers []string, paths map[string]bool) 
 	paths = pathsStillAvailable
 	if err == nil {
 		cloves := utils.NewProxyInit().Split(2, n)
+		//test
+
 		for i, clove := range cloves {
+			utils.LogObj.Named("@Alice").Debug("sending ", clove.Data, " @", clove.Index, " to ", tuple[i])
 			g.sendToPeer(tuple[i], clove.Wrap())
 		}
 	}

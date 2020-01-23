@@ -49,7 +49,7 @@ func (g *Gossiper) PeersHandle(simple bool) {
 			case packet.Ack != nil:
 				g.peerTLCAckHandler(&packet)
 			case packet.Clove != nil:
-				g.cloveHandler(packet.Clove, address.String())
+				g.cloveHandler(*packet.Clove, address.String())
 			default:
 				fmt.Fprintln(os.Stderr, "Message unknown, dropping packet")
 			}
@@ -66,31 +66,44 @@ func (g *Gossiper) getRandomPeer(exclude string) *string {
 	}
 	return &peer
 }
-func (g *Gossiper) cloveHandler(clove *utils.Clove, predecessor string) {
+func (g *Gossiper) cloveHandler(clove utils.Clove, predecessor string) {
 	var sequenceNumber string = string(clove.SequenceNumber)
 	logger := utils.LogObj.Named(fmt.Sprintf("clove_handler@%s", g.Name))
 	//store clove by sequence number
 	if _, ok := g.cloves[sequenceNumber]; !ok {
-		g.cloves[sequenceNumber] = make(map[string]*utils.Clove)
+		g.cloves[sequenceNumber] = make(map[string]utils.Clove)
 	}
 	full := false
 	if _, ok := g.cloves[sequenceNumber][predecessor]; !ok {
-		g.cloves[sequenceNumber][predecessor] = clove
+		logger.Debug("got clove", clove.Data, "from", predecessor)
+		for pr, cl := range g.cloves[sequenceNumber] {
+			logger.Debug("previous: ", cl.Data, " @", cl.Index, " from:", pr)
+		}
+
+		g.cloves[sequenceNumber][predecessor] = utils.Clove{
+			Index:          clove.Index,
+			SequenceNumber: clove.SequenceNumber,
+			Threshold:      clove.Threshold,
+			Data:           make([]byte, len(clove.Data)),
+		}
+		copy(g.cloves[sequenceNumber][predecessor].Data, clove.Data)
 		if len(g.cloves[sequenceNumber]) >= int(clove.Threshold) {
-			logger.Debug("recovering cloves with", g.cloves)
+
 			//flip a coin?
 			//clove can be reconstituted, call recover and handle type
 			full = true
 			//reconstitute chain of bytes
-			cloves := make([]*utils.Clove, 0)
+			cloves := make([]utils.Clove, 0)
 			paths := [2]string{"", ""}
 			i := 0
 			for path, collected := range g.cloves[sequenceNumber] {
+				logger.Debug("from:", path, " : clove=", g.cloves[sequenceNumber][path])
 				cloves = append(cloves, collected)
 				paths[i] = path
 				i++
 			}
 			df := utils.NewDataFragment(cloves[:clove.Threshold])
+			logger.Debug(df)
 			switch {
 			case df.Proxy != nil:
 				if df.Proxy.Forward {

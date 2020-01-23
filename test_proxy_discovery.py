@@ -54,9 +54,9 @@ if __name__ == '__main__':
     eve = Peerster('Eve').mute()
     fred = Peerster('Fred').mute()
     gerry = Peerster('Gerry').mute()
-    alice.knows(charlie).knows(bob).knows(fred).knows(gerry).mute()
-    bob.knows(dave)
-    charlie.knows(dave)
+    alice.knows(charlie).knows(bob).knows(fred).knows(gerry)
+    bob.knows(dave).mute()
+    charlie.knows(dave).mute()
     processes = [peerster.run() for peerster in peersters]
     time.sleep(30)
     for process in processes:

@@ -136,7 +136,7 @@ type DataFragment struct {
 /*
 NewDataFragment returns a DataFragment recovered from k cloves
 */
-func NewDataFragment(cloves []*Clove) *DataFragment {
+func NewDataFragment(cloves []Clove) *DataFragment {
 	threshold := len(cloves) //cloves[0].Threshold
 	xs := make([]int, threshold)
 	data := make([][]byte, threshold)
