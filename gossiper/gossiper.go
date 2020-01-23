@@ -241,6 +241,17 @@ type Proxy struct {
 	ProxySN    []byte
 }
 
+func (g *Gossiper) initiate(n uint, knownPeers []string, paths map[string]bool) {
+	tuple, pathsStillAvailable, err := getTuple(n, paths, knownPeers)
+	paths = pathsStillAvailable
+	if err == nil {
+		cloves := utils.NewProxyInit().Split(2, n)
+		for i, clove := range cloves {
+			g.sendToPeer(tuple[i], clove.Wrap())
+		}
+	}
+}
+
 /*
 initiator maintains a proxy pool by periodically trying to discover new ones
 BIG QUESTION: is it enough to take distincts pairs or do _ALL_ the paths have to be distinct
@@ -253,18 +264,12 @@ func (g *Gossiper) initiator(n uint, period time.Duration, peersAtBootstrap []st
 	knownPeers := peersAtBootstrap
 	paths := map[string]bool{}
 	proxies := make([]*Proxy, 0)
+	g.initiate(n, knownPeers, paths)
 	for {
 		select {
 		case <-time.After(time.Second * period):
 			//initiate proxy search
-			tuple, pathsStillAvailable, err := getTuple(n, paths, knownPeers)
-			paths = pathsStillAvailable
-			if err == nil {
-				cloves := utils.NewProxyInit().Split(2, n)
-				for i, clove := range cloves {
-					g.sendToPeer(tuple[i], clove.Wrap())
-				}
-			}
+			g.initiate(n, knownPeers, paths)
 		case peersUpdate := <-peersUpdates:
 			knownPeers = peersUpdate
 		case newProxy := <-g.newProxies:

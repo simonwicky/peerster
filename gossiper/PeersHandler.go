@@ -67,8 +67,8 @@ func (g *Gossiper) getRandomPeer(exclude string) *string {
 	return &peer
 }
 func (g *Gossiper) cloveHandler(clove *utils.Clove, predecessor string) {
-	var sequenceNumber string
-	logger := utils.LogObj
+	var sequenceNumber string = string(clove.SequenceNumber)
+	logger := utils.LogObj.Named(fmt.Sprintf("clove_handler@%s", g.Name))
 	//store clove by sequence number
 	if _, ok := g.cloves[sequenceNumber]; !ok {
 		g.cloves[sequenceNumber] = make(map[string]*utils.Clove)
@@ -76,9 +76,8 @@ func (g *Gossiper) cloveHandler(clove *utils.Clove, predecessor string) {
 	full := false
 	if _, ok := g.cloves[sequenceNumber][predecessor]; !ok {
 		g.cloves[sequenceNumber][predecessor] = clove
-		logger.Debug("got", len(g.cloves[sequenceNumber]), "cloves...")
 		if len(g.cloves[sequenceNumber]) >= int(clove.Threshold) {
-			logger.Debug("recovering cloves")
+			logger.Debug("recovering cloves with", g.cloves)
 			//flip a coin?
 			//clove can be reconstituted, call recover and handle type
 			full = true
@@ -121,14 +120,14 @@ func (g *Gossiper) cloveHandler(clove *utils.Clove, predecessor string) {
 			if successor := g.getRandomPeer(predecessor); successor != nil {
 				logger.Debug("Forwarding clove to ", *successor)
 				g.sendToPeer(*successor, clove.Wrap())
+			} else {
+				logger.Debug(g.cloves)
+				logger.Warn("could not get a successor!")
 			}
 
 			//forward to one random neighbour
-		} else {
-			logger.Debug("dropping clove")
 		}
 	}
-	logger.Debug(g.cloves)
 }
 func (g *Gossiper) peerSimpleMessageHandler(packet *utils.GossipPacket) {
 

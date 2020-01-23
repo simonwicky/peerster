@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"crypto/rand"
+
 	"go.dedis.ch/protobuf"
 )
 
@@ -139,9 +141,10 @@ func NewDataFragment(cloves []*Clove) *DataFragment {
 	xs := make([]int, threshold)
 	data := make([][]byte, threshold)
 	for i, clove := range cloves {
-		xs[i] = int(clove.Index) + 1
+		xs[i] = int(clove.Index)
 		data[i] = clove.Data
 	}
+	LogObj.Named("df").Debug(xs, data, cloves)
 	marshalled := recoverSecret(data, xs)
 	var df DataFragment
 	err := protobuf.Decode(marshalled, &df)
@@ -180,9 +183,12 @@ func (df *DataFragment) Split(k uint, n uint) []*Clove {
 		return nil
 	}
 	secrets := splitSecret(marshal, int(k), int(n))
+	sn := make([]byte, 8)
+	rand.Read(sn)
 	cloves := make([]*Clove, len(secrets))
 	for i, secret := range secrets {
-		cloves[i] = &Clove{Threshold: uint32(k), Index: uint32(i), Data: secret}
+		//generate uuid sequence number
+		cloves[i] = &Clove{Threshold: uint32(k), Index: uint32(i) + 1, Data: secret, SequenceNumber: sn}
 	}
 	return cloves
 }
