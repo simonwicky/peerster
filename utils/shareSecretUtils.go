@@ -4,6 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"math/big"
 )
@@ -31,7 +32,7 @@ func PadBigInt(n []byte) []byte {
 	return n
 }
 
-func EncryptAndSplit(data_raw []byte) (cipherData []*big.Int) {
+func EncryptAndSplit(data_raw []byte) ([]*big.Int, error) {
 	//pad
 	pad_size := SIZE - (len(data_raw) % SIZE)
 	padding := make([]byte, pad_size)
@@ -44,7 +45,7 @@ func EncryptAndSplit(data_raw []byte) (cipherData []*big.Int) {
 	key_bytes := make([]byte, SIZE)
 	_, err := rand.Read(key_bytes)
 	if err != nil {
-		panic("Error generating random bytes")
+		return nil, errors.New("Error generating random bytes")
 	}
 
 	//encrypt
@@ -56,7 +57,7 @@ func EncryptAndSplit(data_raw []byte) (cipherData []*big.Int) {
 	prime, _ := big.NewInt(0).SetString(PRIME, 10)
 
 	//split to big.Int
-	cipherData = make([]*big.Int, len(data)/SIZE)
+	cipherData := make([]*big.Int, len(data)/SIZE)
 	for i := 0; i < len(data)/SIZE; i++ {
 		cipherData[i] = big.NewInt(0).SetBytes(cipherText[SIZE*i : SIZE*(i+1)])
 		if cipherData[i].Cmp(prime) == 1 {
@@ -68,11 +69,11 @@ func EncryptAndSplit(data_raw []byte) (cipherData []*big.Int) {
 	//combine data and key
 	key := big.NewInt(0).SetBytes(key_bytes)
 	cipherData = append(cipherData, key)
-	return
+	return cipherData, nil
 
 }
 
-func CombineAndDecrypt(cipherDataKey []*big.Int) (data []byte) {
+func CombineAndDecrypt(cipherDataKey []*big.Int) ([]byte, error) {
 	//split data and key
 	key := cipherDataKey[len(cipherDataKey)-1]
 	cipherData := cipherDataKey[:len(cipherDataKey)-1]
@@ -90,17 +91,17 @@ func CombineAndDecrypt(cipherDataKey []*big.Int) (data []byte) {
 	key_bytes = PadBigInt(key_bytes)
 	c, _ := aes.NewCipher(key_bytes)
 	cbc := cipher.NewCBCDecrypter(c, []byte(AES_IV))
-	data = make([]byte, len(cipherText))
+	data := make([]byte, len(cipherText))
 	cbc.CryptBlocks(data, cipherText)
 	fmt.Println(data)
 	//remove padding
 	pad_size := int(data[0])
 	if pad_size > SIZE {
-		panic("Invalid padding, error during decryption")
+		return nil, errors.New("Invalid padding, error during decryption")
 	}
 	data = data[pad_size:]
 
-	return
+	return data, nil
 }
 
 //polynomial [a,b,c,d] is a + bx + cx^2 + dx^3

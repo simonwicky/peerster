@@ -136,7 +136,7 @@ type DataFragment struct {
 /*
 NewDataFragment returns a DataFragment recovered from k cloves
 */
-func NewDataFragment(cloves []*Clove) *DataFragment {
+func NewDataFragment(cloves []*Clove) (*DataFragment, error) {
 	threshold := len(cloves) //cloves[0].Threshold
 	xs := make([]int, threshold)
 	data := make([][]byte, threshold)
@@ -144,14 +144,16 @@ func NewDataFragment(cloves []*Clove) *DataFragment {
 		xs[i] = int(clove.Index)
 		data[i] = clove.Data
 	}
-	marshalled := recoverSecret(data, xs)
-	var df DataFragment
-	err := protobuf.Decode(marshalled, &df)
+	marshalled, err := recoverSecret(data, xs)
 	if err != nil {
-		LogObj.Fatal(err.Error())
-		return nil
+		return nil, err
 	}
-	return &df
+	var df DataFragment
+	err = protobuf.Decode(marshalled, &df)
+	if err != nil {
+		return nil, err
+	}
+	return &df, nil
 }
 
 func NewProxyInit() *DataFragment {
@@ -173,15 +175,18 @@ func NewProxyAck(sessionKey []byte) *DataFragment {
 /*
 	Split splits a DataFragment into n cloves
 */
-func (df *DataFragment) Split(k uint, n uint) []*Clove {
+func (df *DataFragment) Split(k uint, n uint) ([]*Clove, error) {
 	if n == 0 {
-		return nil
+		return nil, nil
 	}
 	marshal, err := protobuf.Encode(df)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	secrets := splitSecret(marshal, int(k), int(n))
+	secrets, err := splitSecret(marshal, int(k), int(n))
+	if err != nil {
+		return nil, err
+	}
 	sn := make([]byte, 8)
 	rand.Read(sn)
 	cloves := make([]*Clove, len(secrets))
@@ -189,7 +194,7 @@ func (df *DataFragment) Split(k uint, n uint) []*Clove {
 		//generate uuid sequence number
 		cloves[i] = &Clove{Threshold: uint32(k), Index: uint32(i) + 1, Data: secret, SequenceNumber: sn}
 	}
-	return cloves
+	return cloves, nil
 }
 
 type ProxyRequest struct {

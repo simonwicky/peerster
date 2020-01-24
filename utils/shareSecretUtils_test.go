@@ -16,7 +16,8 @@ func TestEncryptDecrypt(t *testing.T) {
 			continue
 		}
 		_,_ = crand.Read(data)
-		plaintext := CombineAndDecrypt(EncryptAndSplit(data))
+		cipherText,_ := EncryptAndSplit(data)
+		plaintext,_ := CombineAndDecrypt(cipherText)
 		if len(plaintext) != len(data) {
 			t.Errorf("Wrong output length %d, expected %d\n", len(plaintext), len(data))
 		}

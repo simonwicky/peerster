@@ -204,26 +204,32 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 	p := 0.8
 	if met, cloves, paths := cc.MeetsThreshold(sequenceNumber, clove.Threshold); met {
 		logger.Debug("recovered clove from", paths)
-		df := utils.NewDataFragment(cloves)
-		switch {
-		case df.Proxy != nil:
-			if df.Proxy.Forward {
-				if df.Proxy.SessionKey == nil {
-					output := utils.NewProxyAccept().Split(2, 2)
-					//accept to be a proxy
-					for i, path := range paths {
-						logger.Debug("sent accept clove to ", path)
-						g.sendToPeer(path, output[i].Wrap())
+		df, err := utils.NewDataFragment(cloves)
+		if err == nil {
+			switch {
+			case df.Proxy != nil:
+				if df.Proxy.Forward {
+					if df.Proxy.SessionKey == nil {
+						output, err := utils.NewProxyAccept().Split(2, 2)
+						if err == nil {
+							//accept to be a proxy
+							for i, path := range paths {
+								logger.Debug("sent accept clove to ", path)
+								g.sendToPeer(path, output[i].Wrap())
+							}
+						}
+					} else {
+						// register session key
 					}
 				} else {
-					// register session key
+					var fixPaths [2]string
+					copy(fixPaths[:], paths[:2])
+					// record proxy and send session key
+					g.newProxies <- &Proxy{Paths: fixPaths}
 				}
-			} else {
-				var fixPaths [2]string
-				copy(fixPaths[:], paths[:2])
-				// record proxy and send session key
-				g.newProxies <- &Proxy{Paths: fixPaths}
 			}
+		} else {
+			logger.Fatal(err.Error())
 		}
 	} else { // !full
 		//forward to one random neighbour

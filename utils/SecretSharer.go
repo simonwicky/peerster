@@ -56,7 +56,7 @@ import (
 // 	s.recoverSecret(array)
 // }
 
-func recoverSecret(data [][]byte, pointX []int) []byte {
+func recoverSecret(data [][]byte, pointX []int) ([]byte, error) {
 	var result_data []*big.Int
 	points := make(map[int]*big.Int)
 
@@ -67,25 +67,28 @@ func recoverSecret(data [][]byte, pointX []int) []byte {
 		//recover part i of secret using lagrange polynomial
 		result_data = append(result_data, ComputeLagrange(points))
 	}
-	plain_data := CombineAndDecrypt(result_data)
-	return plain_data
+	return CombineAndDecrypt(result_data)
+
 	//direct data to proxy/content/whatever
 }
 
 //==============================
 //Split secret
 //==============================
-func splitSecret(data []byte, threshold int, n int) [][]byte {
+func splitSecret(data []byte, threshold int, n int) ([][]byte, error) {
 	if threshold < 2 {
 		fmt.Fprintln(os.Stderr, "Threshold must be greater than 2")
-		return nil
+		return nil, nil
 	}
 	if threshold > n {
 		fmt.Fprintln(os.Stderr, "N must be at least equal to threshold")
-		return nil
+		return nil, nil
 	}
 
-	data_split := EncryptAndSplit(data)
+	data_split, err := EncryptAndSplit(data)
+	if err != nil {
+		return [][]byte{}, err
+	}
 	nb_blocks := len(data_split)
 	//generating polynomials
 
@@ -117,5 +120,5 @@ func splitSecret(data []byte, threshold int, n int) [][]byte {
 		result = append(result, tmp)
 	}
 
-	return result
+	return result, nil
 }

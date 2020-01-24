@@ -296,12 +296,15 @@ and sends a clove to each path
 func (g *Gossiper) initiate(n uint, knownPeers []string, pathsTaken map[string]bool) map[string]bool {
 	tuple, pathsStillAvailable, err := getTuple(n, pathsTaken, knownPeers)
 	if err == nil {
-		cloves := utils.NewProxyInit().Split(2, n)
+		cloves, err := utils.NewProxyInit().Split(2, n)
 		//test
-
-		for i, clove := range cloves {
-			utils.LogObj.Named("init").Debug("sending to ", tuple[i], clove.Data)
-			g.sendToPeer(tuple[i], clove.Wrap())
+		if err == nil {
+			for i, clove := range cloves {
+				utils.LogObj.Named("init").Debug("sending to ", tuple[i], clove.Data)
+				g.sendToPeer(tuple[i], clove.Wrap())
+			}
+		} else {
+			utils.LogObj.Fatal(err.Error())
 		}
 	}
 	return pathsStillAvailable
@@ -334,9 +337,13 @@ func (g *Gossiper) initiator(n uint, period time.Duration, peersAtBootstrap []st
 			pool.Add(newProxy)
 			sessionKey := make([]byte, g.settings.SessionKeySize)
 			rand.Read(sessionKey) // always return nil error per documentation
-			cloves := utils.NewProxyAck(sessionKey).Split(2, 2)
-			for i, clove := range cloves {
-				g.sendToPeer(newProxy.Paths[i], clove.Wrap())
+			cloves, err := utils.NewProxyAck(sessionKey).Split(2, 2)
+			if err == nil {
+				for i, clove := range cloves {
+					g.sendToPeer(newProxy.Paths[i], clove.Wrap())
+				}
+			} else {
+				utils.LogObj.Fatal(err.Error())
 			}
 		}
 	}
