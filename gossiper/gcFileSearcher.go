@@ -76,11 +76,12 @@ func contains(haystack []*utils.SearchResult, needle *utils.SearchResult) bool{
 func (s *GCFileSearcher) manageRequest(searchRequest *utils.GCSearchRequest){
 	ticker := time.NewTicker(time.Second * time.Duration(5))
 	var receivedResults []*utils.SearchResult
-	peersOrdering := s.g.FilesRouting.RoutesSorted(searchRequest.Keywords)
+	fRoutesSorted := s.g.FilesRouting.RoutesSorted(searchRequest.Keywords)
 
-	for _, peer := range peersOrdering {
+	for _, fRoute := range fRoutesSorted {
 		if len(receivedResults) < int(s.matchThreshold){
-			s.SendRequest(searchRequest, peer)
+			//should we send the request to other peers if the first does not respond
+			s.SendRequest(searchRequest, fRoute.routes[0])
 			select{
 				case reply := <- s.replies:
 					s.g.FilesRouting.UpdateRouting(reply)
