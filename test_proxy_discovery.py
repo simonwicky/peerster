@@ -33,7 +33,7 @@ class Peerster:
     def run(self):
         global N
         peers = ['-peers', reduce(lambda a, b: a+','+str(b), self.peers)] if len(self.peers) > 0 else []
-        base = ['./Peerster', '-name', self.name]
+        base = ['./peerster', '-name', self.name]
         ui = ['-UIPort', str(self.UIPort)]
         n = ['-N', str(N)]
         gossip = ['-gossipAddr', '127.0.0.1:{}'.format(self.gossipPort)]

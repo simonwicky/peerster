@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/simonwicky/Peerster/utils"
@@ -91,7 +92,7 @@ func NewClovesCollector(g *Gossiper) *ClovesCollector {
 	return cc
 }
 
-func (cc *ClovesCollector) Add(clove *utils.Clove, predecessor string) {
+func (cc *ClovesCollector) Add(clove *utils.Clove, predecessor string) bool {
 	var sequenceNumber string = string(clove.SequenceNumber)
 	//make sure there is storage for that sequence number
 	if _, ok := cc.cloves[sequenceNumber]; !ok {
@@ -104,6 +105,7 @@ func (cc *ClovesCollector) Add(clove *utils.Clove, predecessor string) {
 	//store the clove; make sure to deep copy clove data
 	idx := clove.Index
 	if _, ok := cc.cloves[sequenceNumber][predecessor][idx]; !ok {
+
 		cc.cloves[sequenceNumber][predecessor][idx] = &utils.Clove{
 			Index:          clove.Index,
 			SequenceNumber: clove.SequenceNumber,
@@ -111,9 +113,10 @@ func (cc *ClovesCollector) Add(clove *utils.Clove, predecessor string) {
 			Data:           make([]byte, len(clove.Data)),
 		}
 		copy(cc.cloves[sequenceNumber][predecessor][idx].Data, clove.Data)
+		return true
 	}
 	//check if the threshold is met for that sequence numnber
-
+	return false
 }
 
 /*
@@ -121,17 +124,17 @@ MeetsThreshold checks if there are k cloves matching the given sequence-number i
 		Basically we have to check if there are k ways to choose cloves with both distinct
 		predecessors and indices. Generally, this is NP-complete
 */
-func (cc *ClovesCollector) MeetsThreshold(sn string, k uint32) (bool, []*utils.Clove) {
+func (cc *ClovesCollector) MeetsThreshold(sn string, k uint32) (bool, []*utils.Clove, []string) {
 	if seq, ok := cc.cloves[sn]; ok {
 		if uint32(len(seq)) >= k {
 			ids, paths, cover := pathsCovered(seq, k)
-			return getKIndependentCloves(k, seq, paths, ids, cover, make([]*utils.Clove, 0))
+			return getKIndependentCloves(k, seq, paths, ids, cover, make([]*utils.Clove, 0), []string{})
 		}
 		// there are less paths than
-		return false, []*utils.Clove{}
+		return false, []*utils.Clove{}, []string{}
 	} else {
 		utils.LogObj.Fatal("sequence number ", sn, " not found")
-		return false, []*utils.Clove{}
+		return false, []*utils.Clove{}, []string{}
 	}
 
 }
@@ -171,73 +174,59 @@ func removeAtI(i int, a []uint32) []uint32 {
 getKIndependentCloves
 -
 */
-func getKIndependentCloves(k uint32, seq map[string]map[uint32]*utils.Clove, pathIsAvailable map[string]bool, indices []uint32, inv map[uint32][]string, res []*utils.Clove) (bool, []*utils.Clove) {
+func getKIndependentCloves(k uint32, seq map[string]map[uint32]*utils.Clove, pathIsAvailable map[string]bool, indices []uint32, inv map[uint32][]string, resa []*utils.Clove, resb []string) (bool, []*utils.Clove, []string) {
 	if k == 0 {
-		return true, res
+		return true, resa, resb
 	}
-	fmt.Println(res, k, indices)
+	//fmt.Println(res, k, indices)
 	for i, index := range indices {
 		for _, predecessor := range inv[index] {
 			if pathIsAvailable[predecessor] {
 				pathIsAvailable[predecessor] = false
-				if ok, cloves := getKIndependentCloves(k-1, seq, pathIsAvailable, removeAtI(i, indices), inv, append(res, seq[predecessor][index])); ok {
-					return true, cloves
+				if ok, cloves, paths := getKIndependentCloves(k-1, seq, pathIsAvailable, removeAtI(i, indices), inv, append(resa, seq[predecessor][index]), append(resb, predecessor)); ok {
+					return true, cloves, paths
 				}
 			}
 		}
 	}
-	return false, []*utils.Clove{}
+	return false, []*utils.Clove{}, []string{}
 }
 
 func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predecessor string) {
-	rec := utils.LogObj.Named("rec")
+	//rec := utils.LogObj.Named("rec")
 	var sequenceNumber string = string(clove.SequenceNumber)
-	logger := utils.LogObj.Named(fmt.Sprintf("clove_handler@%s", g.Name))
-	//store clove by sequence number
+	logger := utils.LogObj.Named("rec")
 
-	full := false
-	if _, ok := cc.cloves[sequenceNumber][predecessor]; !ok {
-		if len(cc.cloves[sequenceNumber]) >= int(clove.Threshold) {
-			rec.Debug("recovered cloves", cc.cloves[sequenceNumber])
-			//flip a coin?
-			//clove can be reconstituted, call recover and handle type
-			/*full = true
-			//reconstitute chain of bytes
-			cloves := make([]*utils.Clove, 0)
-			paths := [2]string{"", ""}
-			i := 0
-			for path, collected := range cc.cloves[sequenceNumber] {
-				rec.Debug(path, ": ", string(collected.Data))
-				cloves = append(cloves, collected)
-				paths[i] = path
-				i++
-			}*/
-			/*df := utils.NewDataFragment(cloves[:clove.Threshold])
-			switch {
-			case df.Proxy != nil:
-				if df.Proxy.Forward {
-					if df.Proxy.SessionKey == nil {
-						cloves := utils.NewProxyAccept().Split(2, 2)
-						//accept to be a proxy
-						for i, path := range paths {
-							g.sendToPeer(path, cloves[i].Wrap())
-						}
-					} else {
-						// register session key
-					}
-				} else {
-					// record proxy and send session key
-					g.newProxies <- &Proxy{Paths: paths}
-				}
-			default:
-				logger.Warn("unimplemented type of data fragment")
-			}*/
-		}
-	} else {
-		logger.Warn("received two cloves from the same predecessor. dropping!")
+	//store clove by sequence number
+	if cc.Add(clove, predecessor) {
+		logger.Debug("added clove: ", string(clove.Data), " of ", sequenceNumber, " from ", predecessor)
 	}
 	p := 0.8
-	if !full { // !full
+	if met, cloves, paths := cc.MeetsThreshold(sequenceNumber, clove.Threshold); met {
+		logger.Debug("recovered clove from", paths)
+		df := utils.NewDataFragment(cloves)
+		switch {
+		case df.Proxy != nil:
+			if df.Proxy.Forward {
+				if df.Proxy.SessionKey == nil {
+					output := utils.NewProxyAccept().Split(2, 2)
+					//accept to be a proxy
+					for i, path := range paths {
+						logger.Debug("sent accept clove to ", path)
+						g.sendToPeer(path, output[i].Wrap())
+					}
+				} else {
+					// register session key
+				}
+			} else {
+				var fixPaths [2]string
+				copy(fixPaths[:], paths[:2])
+				// record proxy and send session key
+				g.newProxies <- &Proxy{Paths: fixPaths}
+			}
+		}
+	} else { // !full
+		//forward to one random neighbour
 		if rand.Float64() < p {
 			if successor := g.getRandomPeer(predecessor); successor != nil {
 				utils.LogObj.Named("fwd").Debug("forwarding clove to ", *successor)
@@ -245,8 +234,6 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 			} else {
 				logger.Warn("could not get a successor!")
 			}
-
-			//forward to one random neighbour
 		}
 	}
 }
@@ -254,7 +241,7 @@ func (cc *ClovesCollector) manage(g *Gossiper) {
 	if g == nil {
 		return
 	}
-	logger := utils.LogObj.Named(fmt.Sprintf("collector@%s", g.Name))
+	logger := utils.LogObj.Named("man")
 	go func() {
 		for {
 			select {
@@ -263,8 +250,8 @@ func (cc *ClovesCollector) manage(g *Gossiper) {
 				cc.cloveHandler(g, newClove.clove, newClove.predecessor)
 			case <-time.After(10 * time.Second):
 				logger.Debug("clearing cloves", len(cc.cloves))
-				//cc.cloves = make(map[string]map[string]*utils.Clove)
-				//runtime.GC()
+				cc.cloves = make(map[string]map[string]map[uint32]*utils.Clove)
+				runtime.GC()
 			}
 		}
 	}()

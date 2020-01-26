@@ -249,7 +249,7 @@ type Proxy struct {
 ProxyPool is a thread-safe store for proxies with convenience methods
 */
 type ProxyPool struct {
-	*sync.RWMutex
+	sync.RWMutex
 	proxies []*Proxy
 }
 
