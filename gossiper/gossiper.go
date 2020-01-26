@@ -222,6 +222,11 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 
 func getTuple(n uint, pathsTaken map[string]bool, peers []string) ([]string, map[string]bool, error) {
 	//shuffle known peers
+	rand.Shuffle(len(peers), func(i, j int) {
+		tmp := peers[i]
+		peers[i] = peers[j]
+		peers[j] = tmp
+	})
 	tuple := make([]string, n)
 	var i uint = 0
 	for _, peer := range peers {

@@ -69,7 +69,7 @@ object Hello extends App {
         def run(f: String => Unit): Future[String] = {
             println(s"$name running on $gossipAddr...")
             Future[String] {
-                cmd ! ProcessLogger(f, err => println(err))
+                cmd ! ProcessLogger(f, err => println(s"$name panic-ed"))
                 s"$name done"
             }
         }
@@ -107,5 +107,17 @@ object Hello extends App {
     val sub = alice ~> eve
     alice - "init"
     val peersters = List(alice, bob, charlie, dave, eve, jack) ++ sub
-    peersters map (_.run(println)) foreach { case f => Await.result(f, Duration.Inf)}
+    val aliceHasSendingTo: String => Unit = (line: String) => {
+        println(line)
+        if(line contains "proxy") {
+            println("[SUCCESS]")
+            System exit 0
+        }
+    }
+    val ignore: String => Unit = (line: String) => {
+        
+    }
+    val testCases: List[String => Unit] = List(aliceHasSendingTo) ++ 1.until(peersters.size).map(i => ((s: String) => ignore(s)))
+    //"go build" !
+    peersters.zip(testCases) map { case (p, fn) => p.run(fn) } foreach { case f => Await.result(f, Duration.Inf)}
 }
