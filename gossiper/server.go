@@ -16,7 +16,22 @@ import (
 func (g *Gossiper) HttpServerHandler(port string) {
 	// Simple static webserver:
 	r := mux.NewRouter()
-	//r.HandleFunc("/proxies", )
+	r.HandleFunc("/proxies", func(w http.ResponseWriter, r *http.Request) {
+		utils.LogObj.Warn("proxies ", g.proxyPool)
+		paths := [][]string{}
+		for _, proxy := range g.proxyPool.proxies {
+			paths = append(paths, proxy.Paths[:])
+		}
+		data, err := json.Marshal(map[string][][]string{
+			"proxies": paths,
+		})
+		if err != nil {
+			utils.LogObj.Fatal(err.Error())
+		} else {
+			w.Write(data)
+		}
+
+	})
 	r.HandleFunc("/message", g.messageHandler).Methods("POST", "GET")
 	r.HandleFunc("/node", g.nodeHandler).Methods("POST", "GET")
 	r.HandleFunc("/file", g.fileHandler).Methods("POST", "GET")

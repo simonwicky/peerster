@@ -2,6 +2,7 @@ package gossiper
 
 import (
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -277,15 +278,18 @@ func (pool *ProxyPool) Add(proxy *Proxy) {
 /*
 GetD returns d random proxies from the ProxyPool
 */
-func (pool *ProxyPool) GetD(d uint) []*Proxy {
+func (pool *ProxyPool) GetD(d uint) ([]*Proxy, error) {
 	pool.Lock()
 	defer pool.Unlock()
+	if uint(len(pool.proxies)) < d {
+		return nil, errors.New("could not find d proxies")
+	}
 	rand.Shuffle(len(pool.proxies), func(i, j int) {
 		tmp := pool.proxies[i]
 		pool.proxies[i] = pool.proxies[j]
 		pool.proxies[j] = tmp
 	})
-	return pool.proxies[:d]
+	return pool.proxies[:d], nil
 }
 
 /*
@@ -306,6 +310,8 @@ func (g *Gossiper) initiate(n uint, knownPeers []string, pathsTaken map[string]b
 		} else {
 			utils.LogObj.Fatal(err.Error())
 		}
+	} else {
+		utils.LogObj.Warn(err.Error())
 	}
 	return pathsStillAvailable
 }

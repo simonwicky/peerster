@@ -127,7 +127,6 @@ DataFragment is a generic type to hold data that can be split to cloves
 	@SessionKey - reserved to send the session key at the end of the
 */
 type DataFragment struct {
-	Message *AnonymousMessage
 	Proxy   *ProxyRequest
 	Query   *Query
 	Content *Content
@@ -203,12 +202,11 @@ type ProxyRequest struct {
 }
 
 type Query struct {
+	Keywords []string
 }
 
 type Content struct {
-}
-
-type AnonymousMessage struct {
+	Data []byte
 }
 
 type GossipPacket struct {

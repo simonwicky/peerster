@@ -110,9 +110,9 @@ func (cc *ClovesCollector) Add(clove *utils.Clove, predecessor string) bool {
 			Index:          clove.Index,
 			SequenceNumber: clove.SequenceNumber,
 			Threshold:      clove.Threshold,
-			Data:           make([]byte, len(clove.Data)),
+			Data:           []byte(string(clove.Data)),
 		}
-		copy(cc.cloves[sequenceNumber][predecessor][idx].Data, clove.Data)
+		//copy(cc.cloves[sequenceNumber][predecessor][idx].Data, clove.Data)
 		return true
 	}
 	//check if the threshold is met for that sequence numnber
@@ -183,6 +183,7 @@ func getKIndependentCloves(k uint32, seq map[string]map[uint32]*utils.Clove, pat
 		for _, predecessor := range inv[index] {
 			if pathIsAvailable[predecessor] {
 				pathIsAvailable[predecessor] = false
+				//check if seen[string(seq[predecessor][index].Data)]
 				if ok, cloves, paths := getKIndependentCloves(k-1, seq, pathIsAvailable, removeAtI(i, indices), inv, append(resa, seq[predecessor][index]), append(resb, predecessor)); ok {
 					return true, cloves, paths
 				}
@@ -201,6 +202,7 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 	if cc.Add(clove, predecessor) {
 		logger.Debug("added clove: ", string(clove.Data), " of ", sequenceNumber, " from ", predecessor)
 	}
+	forwarding := false
 	p := 0.8
 	if met, cloves, paths := cc.MeetsThreshold(sequenceNumber, clove.Threshold); met {
 		logger.Debug("recovered clove from", paths)
@@ -230,9 +232,17 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 				}
 			}
 		} else {
-			logger.Fatal(err.Error())
+			data := []string{}
+			for _, clove := range cloves {
+				data = append(data, fmt.Sprintf("%d::%s", clove.Index, string(clove.Data)))
+			}
+			logger.Fatal(err.Error(), data)
+			forwarding = true
 		}
-	} else { // !full
+	} else {
+		forwarding = true
+	}
+	if forwarding { // !full
 		//forward to one random neighbour
 		if rand.Float64() < p {
 			if successor := g.getRandomPeer(predecessor); successor != nil {
@@ -253,7 +263,6 @@ func (cc *ClovesCollector) manage(g *Gossiper) {
 		for {
 			select {
 			case newClove := <-cc.handler:
-				fmt.Println(newClove)
 				cc.cloveHandler(g, newClove.clove, newClove.predecessor)
 			case <-time.After(10 * time.Second):
 				logger.Debug("clearing cloves", len(cc.cloves))
