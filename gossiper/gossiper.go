@@ -95,9 +95,11 @@ type Gossiper struct {
 	consensus  *Consensus
 
 	//cloves; can only receive one clove from particular predecessor for a particular sequence number
-	cloves     map[string]map[string]utils.Clove
-	newProxies chan *Proxy
-	settings   *Settings
+	cloves          map[string]map[string]*utils.Clove
+	newProxies      chan *Proxy
+	settings        *Settings
+	proxyPool       *ProxyPool
+	clovesCollector *ClovesCollector
 }
 
 func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer, hoplimit, peersNumber, stubbornTimeout int, hw3ex2, hw3ex3, hw3ex4 bool) *Gossiper {
@@ -171,7 +173,7 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		return nil
 	}
 
-	return &Gossiper{
+	g := &Gossiper{
 		addressPeer:       udpAddrPeer,
 		connPeer:          udpConnPeer,
 		addressClient:     udpAddrClient,
@@ -200,14 +202,16 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		hw3ex3:            hw3ex3,
 		hw3ex4:            hw3ex4,
 		consensus:         NewConsensus(),
-		cloves:            make(map[string]map[string]utils.Clove),
 		settings: &Settings{
 			SessionKeySize: 32,
 			Buffering:      10,
 		},
 		newProxies: make(chan *Proxy),
+		proxyPool:  &ProxyPool{proxies: make([]*Proxy, 0)},
 		//secretSharer : NewSecretSharer(),
 	}
+	g.clovesCollector = NewClovesCollector(g)
+	return g
 }
 
 /*type Proxy struct {
@@ -215,21 +219,21 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 	PublicKey crypto.PublicKey
 }*/
 
-func getTuple(n uint, paths map[string]bool, peers []string) ([]string, map[string]bool, error) {
+func getTuple(n uint, pathsTaken map[string]bool, peers []string) ([]string, map[string]bool, error) {
 	//shuffle known peers
 	tuple := make([]string, n)
 	var i uint = 0
 	for _, peer := range peers {
-		if _, ok := paths[peer]; !ok {
+		if taken, ok := pathsTaken[peer]; !ok || !taken {
 			tuple[i] = peer
 			i++
-			delete(paths, peer)
+			pathsTaken[peer] = true
 			if i >= n {
-				return tuple, paths, nil
+				return tuple, pathsTaken, nil
 			}
 		}
 	}
-	return tuple[:i], paths, fmt.Errorf("Not enough available paths!")
+	return tuple[:i], pathsTaken, fmt.Errorf("Not enough available paths!")
 }
 
 /*
@@ -241,18 +245,66 @@ type Proxy struct {
 	ProxySN    []byte
 }
 
-func (g *Gossiper) initiate(n uint, knownPeers []string, paths map[string]bool) {
-	tuple, pathsStillAvailable, err := getTuple(n, paths, knownPeers)
-	paths = pathsStillAvailable
+/*
+ProxyPool is a thread-safe store for proxies with convenience methods
+*/
+type ProxyPool struct {
+	*sync.RWMutex
+	proxies []*Proxy
+}
+
+/*
+Cover returns a map of all the paths taken by the pool's proxies in aggregate
+*/
+func (pool *ProxyPool) Cover() map[string]bool {
+	pathsTaken := map[string]bool{}
+	for _, proxy := range pool.proxies {
+		pathsTaken[proxy.Paths[0]] = true
+		pathsTaken[proxy.Paths[1]] = true
+	}
+	return pathsTaken
+}
+
+/*
+Add adds a new proxy to the pool
+*/
+func (pool *ProxyPool) Add(proxy *Proxy) {
+	pool.Lock()
+	defer pool.Unlock()
+	pool.proxies = append(pool.proxies, proxy)
+}
+
+/*
+GetD returns d random proxies from the ProxyPool
+*/
+func (pool *ProxyPool) GetD(d uint) []*Proxy {
+	pool.Lock()
+	defer pool.Unlock()
+	rand.Shuffle(len(pool.proxies), func(i, j int) {
+		tmp := pool.proxies[i]
+		pool.proxies[i] = pool.proxies[j]
+		pool.proxies[j] = tmp
+	})
+	return pool.proxies[:d]
+}
+
+/*
+initiate creates a new proxy init message,
+splits it in n cloves, gets n paths from the known peers
+and sends a clove to each path
+*/
+func (g *Gossiper) initiate(n uint, knownPeers []string, pathsTaken map[string]bool) map[string]bool {
+	tuple, pathsStillAvailable, err := getTuple(n, pathsTaken, knownPeers)
 	if err == nil {
 		cloves := utils.NewProxyInit().Split(2, n)
 		//test
 
 		for i, clove := range cloves {
-			utils.LogObj.Named("@Alice").Debug("sending ", clove.Data, " @", clove.Index, " to ", tuple[i])
+			utils.LogObj.Named("init").Debug("sending to ", tuple[i], clove.Data)
 			g.sendToPeer(tuple[i], clove.Wrap())
 		}
 	}
+	return pathsStillAvailable
 }
 
 /*
@@ -264,19 +316,22 @@ BIG QUESTION: is it enough to take distincts pairs or do _ALL_ the paths have to
 	let's assume distinct paths(one path = one and only one proxy)
 */
 func (g *Gossiper) initiator(n uint, period time.Duration, peersAtBootstrap []string, peersUpdates chan []string) {
+	logger := utils.LogObj.Named("init")
 	knownPeers := peersAtBootstrap
-	paths := map[string]bool{}
-	proxies := make([]*Proxy, 0)
-	g.initiate(n, knownPeers, paths)
+	pathsTaken := map[string]bool{}
+	pool := g.proxyPool
+	g.initiate(n, knownPeers, pathsTaken)
 	for {
 		select {
 		case <-time.After(time.Second * period):
+			pathsTaken = pool.Cover()
 			//initiate proxy search
-			g.initiate(n, knownPeers, paths)
+			pathsTaken = g.initiate(n, knownPeers, pathsTaken)
 		case peersUpdate := <-peersUpdates:
 			knownPeers = peersUpdate
 		case newProxy := <-g.newProxies:
-			proxies = append(proxies, newProxy)
+			logger.Debug("New proxy")
+			pool.Add(newProxy)
 			sessionKey := make([]byte, g.settings.SessionKeySize)
 			rand.Read(sessionKey) // always return nil error per documentation
 			cloves := utils.NewProxyAck(sessionKey).Split(2, 2)
@@ -412,7 +467,7 @@ func (g *Gossiper) addToKnownPeers(address string) bool {
 			return false
 		}
 	}
-	fmt.Fprintf(os.Stderr, "Adding peer %s to known peers\n", address)
+	//fmt.Fprintf(os.Stderr, "Adding peer %s to known peers\n", address)
 	g.knownPeers = append(g.knownPeers, address)
 	return true
 }

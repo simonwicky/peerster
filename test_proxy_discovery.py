@@ -37,7 +37,10 @@ class Peerster:
         ui = ['-UIPort', str(self.UIPort)]
         n = ['-N', str(N)]
         gossip = ['-gossipAddr', '127.0.0.1:{}'.format(self.gossipPort)]
-        process = subprocess.Popen(base+gossip+ui+peers+n, stdout=subprocess.PIPE) if self.muted else subprocess.Popen(base+gossip+ui+peers+n)
+        cmd = base+gossip+ui+peers+n
+        print(reduce(lambda x,y: str(x) + ' '+str(y), cmd))
+        #process = subprocess.Popen(cmd, stdout=subprocess.PIPE) if self.muted else subprocess.Popen(base+gossip+ui+peers+n)
+        process = None
         self.process = process
         return process
     def dump(self):
@@ -51,13 +54,13 @@ if __name__ == '__main__':
     bob = Peerster('Bob')
     charlie = Peerster('Charlie')
     dave = Peerster('Dave')
-    eve = Peerster('Eve').mute()
-    fred = Peerster('Fred').mute()
-    gerry = Peerster('Gerry').mute()
-    alice.knows(charlie).knows(bob).knows(fred).knows(gerry)
-    bob.knows(dave).mute()
-    charlie.knows(dave).mute()
-    processes = [peerster.run() for peerster in peersters]
+    eve = Peerster('Eve')
+    #fred = Peerster('Fred').mute()
+    #gerry = Peerster('Gerry').mute()
+    alice.knows(charlie).knows(bob).knows(eve)#.knows(fred).knows(gerry)
+    bob.knows(dave)
+    charlie.knows(dave)
+    processes = [peerster.run() for peerster in peersters[:5]]
     time.sleep(30)
     for process in processes:
         process.kill

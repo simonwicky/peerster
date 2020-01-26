@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"strings"
 )
 
 func LogRumor(packet *RumorMessage, address string) {
@@ -122,22 +123,13 @@ Logger contrarily to glog and Logger aims at having a backend for console
 on the client side and backdoor for testing
 */
 type Logger struct {
-	warnings   bool
-	debugs     bool
-	fatals     bool
-	named      bool
-	name       string
-	filtered   bool
-	filter     string
-	identifier string
-	identified bool
-}
-
-func (logger *Logger) Identified(id string) *Logger {
-	copy := *logger
-	copy.identified = true
-	copy.identifier = id
-	return &copy
+	warnings bool
+	debugs   bool
+	fatals   bool
+	named    bool
+	name     string
+	filtered bool
+	filter   map[string]bool
 }
 
 var (
@@ -151,19 +143,6 @@ func (logger *Logger) getName() string {
 	return logger.name
 }
 
-/*
-Set sets the level of verbosity of the logger
-*/
-func (logger *Logger) Set(f bool, w bool, l bool, d bool, t bool, cgui bool, n bool, filter string) {
-	logger.debugs = d
-	logger.warnings = w
-	logger.fatals = f
-	logger.named = n
-	if filter != "" {
-		logger.filter = filter
-		logger.filtered = true
-	}
-}
 func (logger *Logger) getname() string {
 	if logger.named {
 		return fmt.Sprintf("\033[1;38;5;%dm<%s>\033[0m", 225, logger.name)
@@ -176,8 +155,12 @@ Debug logs debug statement to the stdout
 */
 func (logger *Logger) Debug(msg ...interface{}) {
 	if logger.debugs {
-		if !logger.named || !logger.filtered || logger.name == logger.filter {
+		if !logger.filtered {
 			fmt.Println("[\033[0;36mDEBUG\033[0m]", logger.getname(), fmt.Sprint(msg...))
+		} else {
+			if _, ok := logger.filter[logger.name]; ok {
+				fmt.Println("[\033[0;36mDEBUG\033[0m]", logger.getname(), fmt.Sprint(msg...))
+			}
 		}
 	}
 }
@@ -201,6 +184,13 @@ func (logger *Logger) Named(name string) *Logger {
 	return &copy
 }
 
+func (logger *Logger) Filter(filters string) {
+	for _, filter := range strings.Split(filters, ",") {
+		logger.filter[filter] = true
+	}
+	logger.filtered = true
+}
+
 //func log(msg ...interface{}, )
 
 func defaultLogger() *Logger {
@@ -210,7 +200,7 @@ func defaultLogger() *Logger {
 		fatals:   true,
 		name:     "default",
 		named:    false,
-		filter:   "",
+		filter:   make(map[string]bool),
 		filtered: false,
 	}
 }

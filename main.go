@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/simonwicky/Peerster/gossiper"
+	"github.com/simonwicky/Peerster/utils"
 )
 
 func main() {
@@ -23,10 +24,11 @@ func main() {
 	var hw3ex2 = flag.Bool("hw3ex2", false, "Enable TLCMessage when storing file")
 	var hw3ex3 = flag.Bool("hw3ex3", false, "Enable TLC Round")
 	var hw3ex4 = flag.Bool("hw3ex4", false, "Enable QSC")
+	var filters = flag.String("filter", "", "activated log tags")
 
 	var _ = flag.Bool("ackall", true, "Ack everything")
 	flag.Parse()
-
+	utils.LogObj.Filter(*filters)
 	gossiper := gossiper.NewGossiper("127.0.0.1:"+*udpPort, *gossipAddr, *name, *peers, *antiEntropy, *rtimer, *hoplimit, *numberPeers, *stubbornTimeout, *hw3ex2, *hw3ex3, *hw3ex4)
 	if gossiper == nil {
 		fmt.Fprintln(os.Stderr, "Problem initializing gossiper")
