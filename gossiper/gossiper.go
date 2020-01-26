@@ -340,6 +340,7 @@ func (g *Gossiper) initiator(n uint, period time.Duration, peersAtBootstrap []st
 			cloves, err := utils.NewProxyAck(sessionKey).Split(2, 2)
 			if err == nil {
 				for i, clove := range cloves {
+					logger.Debug("sent ack ", string(clove.SequenceNumber), " to ", newProxy.Paths[i])
 					g.sendToPeer(newProxy.Paths[i], clove.Wrap())
 				}
 			} else {

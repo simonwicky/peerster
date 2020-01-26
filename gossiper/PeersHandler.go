@@ -220,6 +220,7 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 						}
 					} else {
 						// register session key
+						logger.Debug("registering session key")
 					}
 				} else {
 					var fixPaths [2]string
