@@ -78,10 +78,11 @@ object Hello extends App {
             }
             subNetwork.toList
         }
-        def run(f: String => Unit): Future[String] = {
+        def run(f: String => String => Unit): Future[String] = {
             println(s"$name running on $gossipAddr...")
             Future[String] {
-                cmd ! ProcessLogger(f, err => println(s"$name panic-ed"))
+                val fn = f(name)
+                cmd ! ProcessLogger(fn, err => println(s"$name panic-ed"))
                 s"$name done"
             }
         }
@@ -122,33 +123,36 @@ object Hello extends App {
     alice - "init"
     def testAliceFindsOneProxy = {
         val peersters = List(alice, bob, charlie, dave, eve, jack, robert) ++ sub1 ++ sub2
-        val aliceHasSendingTo: String => Unit = (line: String) => {
+        val aliceHasSendingTo: String => String => Unit = (name: String) => (line: String) => {
             //println(line)
             if(line contains "proxy") {
                 println("[SUCCESS]")
                 System exit 0
             }
         }
-        val aliceHasMultipleProxies: String => Unit = {
+        val aliceHasMultipleProxies: String => String => Unit = (name: String) => {
             var cnt = 0
             (line: String) => {
-                if (line contains "proxy") cnt += 1
+                println(s"${"$"}$name> $line")
+                if (line contains "proxy") {
+                    println("one proxy added!")
+                }
                 if(cnt >= 1) {
                     println("[SUCCESS]")
                     System exit 0
                 }
             }
         }
-        val ignore: String => Unit = (line: String) => {
+        val ignore:String =>  String => Unit = (name: String) => (line: String) => {
             
         }
-        val printFatals: String => Unit = (line: String) => {
+        val printFatals: String => String => Unit = (name: String) => (line: String) => {
             if (line contains "FATAL") {
-                println(line)
+                println(s"$name> $line")
             }
         }
         //create map instead
-        val testCases: List[String => Unit] = List(aliceHasMultipleProxies) ++ 1.until(peersters.size).map(i => ((s: String) => printFatals(s)))
+        val testCases: List[String => String => Unit] = List(aliceHasMultipleProxies) ++ 1.until(peersters.size).map(i => ((s: String) => printFatals(s)))
         //"go build" !
         //put timeout instead
         peersters.zip(testCases) map { case (p, fn) => p.run(fn) } foreach { case f => Await.result(f, Duration.Inf)}
