@@ -5,15 +5,18 @@ import ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.util.Random
 object Hello extends App {
-    case class NameGen() {
-        var namesDict = List("Theresa", "Omar", "Sandra", "Jonny", "Toni")
+    case class RandomIDGen() {
+        val r = scala.util.Random
+        //var namesDict = 0.to()
+        //List("Theresa", "Omar", "Sandra", "Jonny", "Toni", "Claudia", )
         def next: String = {
-            val name :: tail = namesDict
-            namesDict = tail
-            name
+            0.to(r.nextInt(10)).map(i => r.nextPrintableChar).mkString("")
+            //val name :: tail = namesDict
+            //namesDict = tail
+            //name
         }
     }
-    val names = NameGen()
+    val names = RandomIDGen()
     case class Counter(init: Int) {
         var i = init
         def next: Int = {
@@ -57,14 +60,23 @@ object Hello extends App {
             nodeA :: nodeB :: Nil
         }
         def ~~~>(peerster: Peerster): List[Peerster] = {
-            /*val k = 4
-            val n = 3*k
+            val k = 4
+            val n = 5*k
             //procedurally generate a sub network between the 2 nodes
             //generate n random nodes; do k random walks
-            val subNetwork = 0.until(k).map(_ => Peerster(names.next)) ++ 0.until(k).map(_ => )
-            val r = scala.util.Random*/
-            
-            this :: Nil
+            val subNetwork = 0.until(n).map(_ => Peerster(names.next))
+            val r = scala.util.Random
+            for(i <- 0.until(k)) {
+                this -> subNetwork(i)
+                var j = i
+                while (r.nextFloat < 0.6) {
+                    val next = r.nextInt(n - 2*k) + k
+                    subNetwork(j) -> subNetwork(next)
+                    j = next
+                }
+                subNetwork(j) -> peerster
+            }
+            subNetwork.toList
         }
         def run(f: String => Unit): Future[String] = {
             println(s"$name running on $gossipAddr...")
@@ -99,25 +111,42 @@ object Hello extends App {
     val dave = Peerster("Dave")
     val eve = Peerster("Eve")
     val jack = Peerster("Jack")
+    val robert = Peerster("Robert")
     alice.knows(bob).knows(charlie)
     bob -> dave
     charlie -> dave
     eve -> jack
     jack -> dave
-    val sub = alice ~> eve
+    val sub1 = alice ~> eve
+    val sub2 = alice ~~~> robert
     alice - "init"
-    val peersters = List(alice, bob, charlie, dave, eve, jack) ++ sub
-    val aliceHasSendingTo: String => Unit = (line: String) => {
-        println(line)
-        if(line contains "proxy") {
-            println("[SUCCESS]")
-            System exit 0
+    def testAliceFindsOneProxy = {
+        val peersters = List(alice, bob, charlie, dave, eve, jack, robert) ++ sub1 ++ sub2
+        val aliceHasSendingTo: String => Unit = (line: String) => {
+            //println(line)
+            if(line contains "proxy") {
+                println("[SUCCESS]")
+                System exit 0
+            }
         }
+        val aliceHasMultipleProxies: String => Unit = {
+            var cnt = 0
+            (line: String) => {
+                if (line contains "proxy") cnt += 1
+                if(cnt >= 1) {
+                    println("[SUCCESS]")
+                    System exit 0
+                }
+            }
+        }
+        val ignore: String => Unit = (line: String) => {
+            
+        }
+        //create map instead
+        val testCases: List[String => Unit] = List(aliceHasMultipleProxies) ++ 1.until(peersters.size).map(i => ((s: String) => ignore(s)))
+        //"go build" !
+        //put timeout instead
+        peersters.zip(testCases) map { case (p, fn) => p.run(fn) } foreach { case f => Await.result(f, Duration.Inf)}
     }
-    val ignore: String => Unit = (line: String) => {
-        
-    }
-    val testCases: List[String => Unit] = List(aliceHasSendingTo) ++ 1.until(peersters.size).map(i => ((s: String) => ignore(s)))
-    //"go build" !
-    peersters.zip(testCases) map { case (p, fn) => p.run(fn) } foreach { case f => Await.result(f, Duration.Inf)}
+    testAliceFindsOneProxy
 }
