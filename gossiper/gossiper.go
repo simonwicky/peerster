@@ -19,6 +19,8 @@ import (
 type Settings struct {
 	SessionKeySize uint
 	Buffering      uint
+	Redundancy     uint          // number of cloves sent for any threshold
+	DiscoveryRate  time.Duration // period of proxy discovery
 }
 
 type Gossiper struct {
@@ -206,6 +208,8 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		settings: &Settings{
 			SessionKeySize: 32,
 			Buffering:      10,
+			Redundancy:     10,
+			DiscoveryRate:  8,
 		},
 		newProxies: make(chan *Proxy),
 		proxyPool:  &ProxyPool{proxies: make([]*Proxy, 0)},
@@ -305,7 +309,7 @@ and sends a clove to each path
 func (g *Gossiper) initiate(n uint, knownPeers []string, pathsTaken map[string]bool) map[string]bool {
 	tuple, pathsStillAvailable, err := getTuple(n, pathsTaken, knownPeers)
 	if err == nil {
-		cloves, err := utils.NewProxyInit().Split(2, n)
+		cloves, err := utils.NewProxyInit().Split(2, g.settings.Redundancy)
 		//test
 		if err == nil {
 			for i, clove := range cloves {
@@ -329,15 +333,16 @@ BIG QUESTION: is it enough to take distincts pairs or do _ALL_ the paths have to
 
 	let's assume distinct paths(one path = one and only one proxy)
 */
-func (g *Gossiper) initiator(n uint, period time.Duration, peersAtBootstrap []string, peersUpdates chan []string) {
+func (g *Gossiper) initiator(n uint, peersAtBootstrap []string, peersUpdates chan []string) {
 	logger := utils.LogObj.Named("init")
 	knownPeers := peersAtBootstrap
 	pathsTaken := map[string]bool{}
 	pool := g.proxyPool
 	g.initiate(n, knownPeers, pathsTaken)
+	ini := time.NewTicker(time.Second * g.settings.DiscoveryRate)
 	for {
 		select {
-		case <-time.After(time.Second * period):
+		case <-ini.C:
 			pathsTaken = pool.Cover()
 			//initiate proxy search
 			pathsTaken = g.initiate(n, knownPeers, pathsTaken)
@@ -371,7 +376,7 @@ func (g *Gossiper) Start(simple bool, port string) {
 	}
 	go g.rumorRoute()
 	go g.HttpServerHandler(port)
-	go g.initiator(3, 10, g.knownPeers, nil)
+	go g.initiator(3, g.knownPeers, nil)
 	g.PeersHandle(simple)
 }
 
