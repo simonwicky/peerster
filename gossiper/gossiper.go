@@ -224,6 +224,9 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 	PublicKey crypto.PublicKey
 }*/
 
+/*
+getTuple returns n paths
+*/
 func getTuple(n uint, pathsTaken map[string]bool, peers []string) ([]string, map[string]bool, error) {
 	//shuffle known peers
 	rand.Shuffle(len(peers), func(i, j int) {
@@ -306,8 +309,8 @@ initiate creates a new proxy init message,
 splits it in n cloves, gets n paths from the known peers
 and sends a clove to each path
 */
-func (g *Gossiper) initiate(n uint, knownPeers []string, pathsTaken map[string]bool) map[string]bool {
-	tuple, pathsStillAvailable, err := getTuple(n, pathsTaken, knownPeers)
+func (g *Gossiper) initiate(knownPeers []string, pathsTaken map[string]bool) map[string]bool {
+	tuple, pathsStillAvailable, err := getTuple(g.settings.Redundancy, pathsTaken, knownPeers)
 	if err == nil {
 		cloves, err := utils.NewProxyInit().Split(2, g.settings.Redundancy)
 		//test
@@ -338,14 +341,14 @@ func (g *Gossiper) initiator(n uint, peersAtBootstrap []string, peersUpdates cha
 	knownPeers := peersAtBootstrap
 	pathsTaken := map[string]bool{}
 	pool := g.proxyPool
-	g.initiate(n, knownPeers, pathsTaken)
+	g.initiate(knownPeers, pathsTaken)
 	ini := time.NewTicker(time.Second * g.settings.DiscoveryRate)
 	for {
 		select {
 		case <-ini.C:
 			pathsTaken = pool.Cover()
 			//initiate proxy search
-			pathsTaken = g.initiate(n, knownPeers, pathsTaken)
+			pathsTaken = g.initiate(knownPeers, pathsTaken)
 		case peersUpdate := <-peersUpdates:
 			knownPeers = peersUpdate
 		case newProxy := <-g.newProxies:

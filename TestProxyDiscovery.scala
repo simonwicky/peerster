@@ -142,8 +142,13 @@ object Hello extends App {
         val ignore: String => Unit = (line: String) => {
             
         }
+        val printFatals: String => Unit = (line: String) => {
+            if (line contains "FATAL") {
+                println(line)
+            }
+        }
         //create map instead
-        val testCases: List[String => Unit] = List(aliceHasMultipleProxies) ++ 1.until(peersters.size).map(i => ((s: String) => ignore(s)))
+        val testCases: List[String => Unit] = List(aliceHasMultipleProxies) ++ 1.until(peersters.size).map(i => ((s: String) => printFatals(s)))
         //"go build" !
         //put timeout instead
         peersters.zip(testCases) map { case (p, fn) => p.run(fn) } foreach { case f => Await.result(f, Duration.Inf)}
