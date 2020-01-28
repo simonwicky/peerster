@@ -111,6 +111,36 @@ const Decorator = props => {
   );
 };
 
+class Gen {
+  constructor(i0) {
+    this.i = i0
+  }
+  next = () => {
+    ++this.i
+    return this.i -1
+  }
+  get = () => this.i
+}
+let gossipPort = new Gen(5000)
+let uiPort = new Gen(7000)
+let httpPort = new Gen(8080)
+let N = new Gen(0)
+class Peerster {
+  constructor(name) {
+    this.name = name 
+    this.gossipAddr = `127.0.0.1:${gossipPort.next()}`
+    this.uiport = uiPort.next()
+    this.httpPort = httpPort.next()
+    this.peers = new Set()
+    N.next()
+  }
+  peerStr = () => this.peers.size > 0 ? `-peers ${Array.from(this.peers).map(peer => peer.gossipAddr).join(',')}` : ''
+  knows = (neighbour) => {
+    this.peers.add(neighbour)
+  }
+  cmd = () => `./peerster -name ${this.name} -gossipAddr ${this.gossipAddr} -UIPort ${this.uiport} ${this.peerStr()} -N ${N.get()}`
+}
+
 class App extends React.Component {
   actions = {
     'Create': <Create update={(name) => {
@@ -127,7 +157,7 @@ class App extends React.Component {
     input: null,
     nodes: [],
     edges: [],
-    action: 'Generate',
+    action: 'Create',
   }
   connect = (nodeA, nodeB) => {
     const k = 2
@@ -197,8 +227,22 @@ class App extends React.Component {
         break
     }
   }
+  run = () => {
+    const nodes = new Map()
+    this.state.nodes.forEach(node => {
+      nodes.set(node, new Peerster(node))
+    })
+    this.state.edges.forEach(([u, v]) => nodes.get(u).knows(nodes.get(v)))
+    const cmds = []
+    nodes.forEach(v => cmds.push(v.cmd()))
+    const query = JSON.stringify({cmds:cmds})
+    fetch('http://localhost:3000/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: query,
+    })
+  }
   render = () => {
-    console.log(this.state.edges)
     //<Button onClick={e => this.connect('Alice', 'Bob')}>Gen</Button>
     return (
       <div >
@@ -219,6 +263,7 @@ class App extends React.Component {
               {['Create', 'Connect', 'Generate'].map((act, i) => <Dropdown.Item onClick={e => this.setState({action: act})} eventKey={i}>{act}</Dropdown.Item>)}
               
             </SplitButton>
+            <Button variant="danger" onClick={this.run}>Run</Button>
           </Navbar.Collapse>
         </Navbar>
         <Network style={{height: '600px'}}>

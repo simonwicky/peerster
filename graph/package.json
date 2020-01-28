@@ -42,5 +42,6 @@
     "react-bootstrap": "^1.0.0-beta.16",
     "react-cytoscapejs": "^1.2.1",
     "react-vis-network": "^1.0.0"
-  }
+  },
+  "proxy": "http://localhost:4000"
 }
