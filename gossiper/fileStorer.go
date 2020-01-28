@@ -224,3 +224,20 @@ func (fs *FileStorage) lookupFile(keyword string) []*FileData {
 	}
 	return results
 }
+
+
+
+func (fs *FileStorage) asSearchResults()[]*utils.SearchResult{
+	var results []*utils.SearchResult
+	fs.lock.RLock()
+	defer fs.lock.RUnlock()
+	for _, fd := range fs.data {
+		result := &utils.SearchResult{
+			FileName: fd.name,
+			MetafileHash: fd.metafileHash,
+			ChunkCount: uint64(fd.size / int64(2 << 12)),
+		}
+		results = append(results,result)
+	}
+	return results
+}

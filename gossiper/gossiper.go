@@ -193,6 +193,7 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		hw3ex3 : hw3ex3,
 		hw3ex4 : hw3ex4,
 		consensus : NewConsensus(),
+		FilesRouting: NewFilesRouting(),
 		//secretSharer : NewSecretSharer(),
 	}
 }
@@ -276,7 +277,7 @@ func (g *Gossiper) sendToPeer(peer string, packet *utils.GossipPacket){
 		if n == 0 {
 			fmt.Fprintln(os.Stderr,err)
 		}
-		fmt.Fprintln(os.Stderr,"Packet sent to " + address.String() + " size: ",n)
+		//fmt.Fprintln(os.Stderr,"Packet sent to " + address.String() + " size: ",n)
 }
 
 func (g *Gossiper) sendPointToPoint(packet *utils.GossipPacket, destination string){
@@ -292,6 +293,10 @@ func (g *Gossiper) sendPointToPoint(packet *utils.GossipPacket, destination stri
 		hoplimit = &packet.SearchReply.HopLimit
 	case packet.Ack != nil:
 		hoplimit = &packet.Ack.HopLimit
+	case packet.GCSearchRequest != nil:
+		hoplimit = &packet.GCSearchRequest.HopLimit
+	case packet.GCSearchReply != nil:
+		hoplimit = &packet.GCSearchReply.HopLimit
 	default:
 		fmt.Fprintln(os.Stderr,"Packet which should not be sent point to point, exiting")
 		return
@@ -330,7 +335,7 @@ func (g *Gossiper) addToKnownPeers(address string) bool {
 //STATUS
 //================================
 func (g *Gossiper) updateStatus(status utils.PeerStatus, index int){
-	fmt.Fprintln(os.Stderr,"Status update")
+	//fmt.Fprintln(os.Stderr,"Status update")
 	g.currentStatus_lock.Lock()
 	if index == -1 {
 		g.currentStatus.Want = append(g.currentStatus.Want, status)
@@ -344,7 +349,7 @@ func (g *Gossiper) updateStatus(status utils.PeerStatus, index int){
 //================================
 func (g *Gossiper) updateDSDV(name,addr string){
 	if name != g.Name {
-		fmt.Fprintln(os.Stderr,"DSDV update")
+		//fmt.Fprintln(os.Stderr,"DSDV update")
 		g.DSDV_lock.Lock()
 		g.DSDV[name] = addr
 		g.DSDV_lock.Unlock()
@@ -360,6 +365,32 @@ func (g *Gossiper) lookupDSDV(name string) string {
 		//Address not found, shouldn't trigger but, you never know
 		return ""
 	}
+}
+
+func (g *Gossiper) peersDSDV() []string{
+	var peers []string
+	g.DSDV_lock.RLock()
+	for name, _  := range g.DSDV{
+		peers = append(peers, name)
+	}
+	g.DSDV_lock.RUnlock()
+	return peers
+}
+
+func (g *Gossiper) knownPeersDSDV() []string{
+	var peers []string
+	g.DSDV_lock.RLock()
+	for _, neighborAddr := range g.knownPeers{
+		for name, ip  := range g.DSDV{
+			fmt.Println(name, neighborAddr, ip)
+			if neighborAddr == ip{
+				peers = append(peers, name)
+			}
+		}
+	}
+
+	g.DSDV_lock.RUnlock()
+	return peers
 }
 
 func (g *Gossiper) dumpDSDV() string {

@@ -41,9 +41,9 @@ func (g *Gossiper) PeersHandle(simple bool){
 					case packet.SearchReply != nil :
 						g.peerSearchReplyHandler(&packet)
 					case packet.GCSearchRequest != nil:
-						g.peerGCSearchRequestHandler(&packet)
+						go g.peerGCSearchRequestHandler(&packet)
 					case packet.GCSearchReply != nil:
-						g.peerGCSearchReplyHandler(&packet)
+						go g.peerGCSearchReplyHandler(&packet)
 					case packet.Rumor != nil || packet.Status != nil :
 						g.peerRumorStatusHandler(&packet,address.String())
 					case packet.TLCMessage != nil :
@@ -70,7 +70,7 @@ func (g *Gossiper) peerSimpleMessageHandler(packet *utils.GossipPacket) {
 }
 
 func (g *Gossiper) peerRumorStatusHandler(packet *utils.GossipPacket, address string){
-	fmt.Fprintln(os.Stderr,"Rumor or Status received")
+	//fmt.Fprintln(os.Stderr,"Rumor or Status received")
 	if worker, ok := g.lookupWorkers(address); ok {
 		worker.Buffer <- *utils.CopyGossipPacket(packet)
 	} else {
@@ -188,11 +188,55 @@ func (g *Gossiper) peerTLCAckHandler(packet *utils.GossipPacket){
 }
 
 func (g *Gossiper) peerGCSearchRequestHandler(packet *utils.GossipPacket){
+	request := packet.GCSearchRequest
+	searcher := g.getGCFileSearcher()
+	searcher.repliesMux.Lock()
+	_, alreadyReceived := searcher.repliesDispatcher[request.ID]; 
+	//Send failure because we already received the request
+	if alreadyReceived {
+		fmt.Printf("Already received GCSearchRequest with ID %d from relay %s\n", packet.GCSearchRequest.ID, packet.GCSearchRequest.Origin)
+		reply := &utils.GCSearchReply{
+			ID: request.ID,
+			Origin: g.Name, 
+			Failure:true,
+			HopLimit:10,
+		}
+		g.sendPointToPoint(&utils.GossipPacket{GCSearchReply:reply}, packet.GCSearchRequest.Origin)
 
+	}
+	searcher.repliesMux.Unlock()
+	
+	if !alreadyReceived{
+
+		var foundFiles []*FileData
+		keywords := packet.GCSearchRequest.Keywords
+		for _, kw := range keywords {
+			foundFiles = append(foundFiles, g.fileStorage.lookupFile(kw)...)
+			//Assuming there is consensus over the file names 
+			if ips :=packet.GCSearchRequest.ProxiesIP; ips != nil && len(keywords) == 1 && foundFiles[0].name == keywords[0] {
+				g.deliverContent(*ips)
+			}
+		}
+		if len(foundFiles) < int(searcher.matchThreshold) {
+			searcher.manageRequest(packet.GCSearchRequest)
+		}
+		routingResults := g.FilesRouting.asSearchResults()
+		accessibleFiles := append(routingResults, g.fileStorage.asSearchResults()... )
+		reply := &utils.GCSearchReply{
+			ID:packet.GCSearchRequest.ID,
+			Origin: g.Name,
+			AccessibleFiles:accessibleFiles,
+			Failure: false,
+			HopLimit:10,
+		}
+		fmt.Println("OOO = ", packet.GCSearchRequest.Origin)
+		g.sendPointToPoint(&utils.GossipPacket{GCSearchReply:reply}, packet.GCSearchRequest.Origin)
+	}
 }
 
 func (g *Gossiper) peerGCSearchReplyHandler(packet *utils.GossipPacket){
-	
+	fmt.Println("received something")
+	g.getGCFileSearcher().receiveReply(packet.GCSearchReply)
 }
 
 

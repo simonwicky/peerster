@@ -19,6 +19,7 @@ func main() {
 	var request = flag.String("request", "", "request a chunk or metafile of this hash")
 	var keywords = flag.String("keywords","","Keywords for perforimg a search")
 	var budget = flag.Uint64("budget",2,"budget for the file search")
+	var gc  = flag.Bool("garlic", false, "set to true with the search arguments to activate the garlic cast search")
 	flag.Parse()
 
 
@@ -58,9 +59,15 @@ func main() {
 	}
 	//flag for file search
 	if *msg == "" && *file == "" && *request == "" && *keywords != ""{
-		message := utils.Message{Budget : budget, Keywords: keywords}
+		var message utils.Message
+		if !*gc {
+			message = utils.Message{Budget : budget, Keywords: keywords}
+		}else {
+			message = utils.Message{GC : gc, Keywords: keywords}
+		}
 		send(&message, GOSSIPER_ADDRESS + ":" + *uiPort)
 		return
+	
 	}
 
 	fmt.Println("ERROR (Bad argument combination)​")
@@ -88,7 +95,7 @@ func send(packet *utils.Message, addr string) {
 	}
 	n,_ := conn.Write(packetBytes)
 
-	fmt.Fprintln(os.Stderr,"Packet sent to " + udpAddr.String() + " size: ",n)
+	//fmt.Fprintln(os.Stderr,"Packet sent to " + udpAddr.String() + " size: ",n)
 	return
 
 

@@ -40,7 +40,12 @@ func (g *Gossiper) ClientHandle(simple bool){
 						//rumor message
 						g.clientRumorHandler(&message)
 					case message.Keywords != nil && len(*message.Keywords) > 0:
-						g.clientFileSearchHandler(&message)
+						if message.GC != nil && *message.GC  {
+							g.clientGCFileSearchHandler(&message)
+
+						}else {
+							g.clientFileSearchHandler(&message)
+						}
 					default :
 						fmt.Fprintln(os.Stderr,"Type of message unknown, dropping message.")
 				}
@@ -111,7 +116,7 @@ func(g *Gossiper) clientGCFileSearchHandler(message *utils.Message) {
 	searcher := g.getGCFileSearcher()
 	if !searcher.running {
 		keywords := strings.Split(*message.Keywords,",")
-		go searcher.Start(keywords)
+		go searcher.startSearch(keywords)
 	} else {
 		fmt.Fprintln(os.Stderr,"File search already running")
 	}

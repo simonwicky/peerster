@@ -5,62 +5,62 @@ import ("fmt"
 		"encoding/hex")
 
 func LogRumor(packet *RumorMessage, address string){
-	fmt.Printf("RUMOR origin %s from %s ID %d contents %s\n",packet.Origin,address,packet.ID,packet.Text)
+	//fmt.Printf("RUMOR origin %s from %s ID %d contents %s\n",packet.Origin,address,packet.ID,packet.Text)
 }
 
 func LogStatus(want []PeerStatus, address string){
-	fmt.Printf("STATUS from %s ", address)
+	/*fmt.Printf("STATUS from %s ", address)
 	for _, status := range want {
 		fmt.Printf("peer %s nextID %d ", status.Identifer, status.NextID)
 	}
-	fmt.Printf("\n")
+	fmt.Printf("\n")*/
 }
 
 func LogSimpleMessage(packet *SimpleMessage){
-	fmt.Printf("SIMPLE MESSAGE origin %s from %s contents %s\n",packet.OriginalName, packet.RelayPeerAddr, packet.Contents)
+	//fmt.Printf("SIMPLE MESSAGE origin %s from %s contents %s\n",packet.OriginalName, packet.RelayPeerAddr, packet.Contents)
 }
 
 func LogPeers(peers []string){
-	fmt.Printf("PEERS %s\n", strings.Join(peers,","))
+	//fmt.Printf("PEERS %s\n", strings.Join(peers,","))
 }
 
 func LogSync(address string){
-	fmt.Printf("IN SYNC WITH %s\n",address)
+	//fmt.Printf("IN SYNC WITH %s\n",address)
 }
 
 func LogFlip(address string){
-	fmt.Printf("FLIPPED COIN sending rumor to %s\n",address)
+	//fmt.Printf("FLIPPED COIN sending rumor to %s\n",address)
 }
 
 func LogMongering(address string){
-	fmt.Printf("MONGERING with %s\n",address)
+	//fmt.Printf("MONGERING with %s\n",address)
 }
 
 func LogDSDV(name, address string){
-	fmt.Printf("DSDV %s %s\n",name,address)
+	//fmt.Printf("DSDV %s %s\n",name,address)
 }
 
 func LogPrivate(packet *PrivateMessage){
-	fmt.Printf("PRIVATE origin %s hop-limit %d contents %s\n",packet.Origin,packet.HopLimit,packet.Text)
+	//fmt.Printf("PRIVATE origin %s hop-limit %d contents %s\n",packet.Origin,packet.HopLimit,packet.Text)
 }
 
 func LogClient(text string){
-	fmt.Printf("CLIENT MESSAGE %s\n",text)
+	//fmt.Printf("CLIENT MESSAGE %s\n",text)
 }
 
 func LogMetafile(filename, peer string){
-	fmt.Printf("DOWNLOADING metafile of %s from %s\n",filename,peer)
+	//fmt.Printf("DOWNLOADING metafile of %s from %s\n",filename,peer)
 }
 
 func LogChunk(filename, peer string, index int){
-	fmt.Printf("DOWNLOADING %s chunk %d from %s\n",filename,index,peer)
+	//fmt.Printf("DOWNLOADING %s chunk %d from %s\n",filename,index,peer)
 }
 
 func LogReconstruct(filename string) {
-	fmt.Printf("RECONSTRUCTED file %s\n",filename)
+	//fmt.Printf("RECONSTRUCTED file %s\n",filename)
 }
 func LogSearchFinished(){
-	fmt.Printf("SEARCH FINISHED\n");
+	//fmt.Printf("SEARCH FINISHED\n");
 }
 func LogFileFound(name, peer, metafile string, chunkMap []uint64){
 	fmt.Printf("FOUND match %s at %s\n",name,peer)
@@ -108,5 +108,13 @@ func LogConsensus(id uint32,msg *TLCMessage,nameList []string){
 	fmt.Printf("file names ")
 	fmt.Printf(strings.Join(nameList, " "))
 	fmt.Printf(" size %d metahash %s\n", msg.TxBlock.Transaction.Size, hex.EncodeToString(msg.TxBlock.Transaction.MetafileHash))
+}
+
+func LogGCSearchReply(reply *GCSearchReply){
+	fmt.Printf("Log Garlic Cast Search Reply from %s with ID %d\n.Accessible files", reply.Origin, reply.ID)
+	for _, file := range reply.AccessibleFiles {
+		fmt.Printf("%s ", file.FileName)
+	}
+	fmt.Printf("\n")
 }
 

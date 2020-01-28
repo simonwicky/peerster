@@ -34,7 +34,7 @@ func NewRumormonger(gossiper *Gossiper, address string, buffer chan utils.Gossip
 }
 
 func (r *Rumormonger) Start() {
-	fmt.Fprintf(os.Stderr,"STARTED talking with %s\n", r.address)
+	//fmt.Fprintf(os.Stderr,"STARTED talking with %s\n", r.address)
 	for {
 		if r.synced && !r.waitingForAck {
 			return
@@ -99,7 +99,7 @@ func (r *Rumormonger) rumorHandler(packet *utils.GossipPacket) {
 		r.G.updateStatus(utils.PeerStatus{Identifer : origin, NextID : nextID}, -1)
 		newMessage = true;
 	} else {
-		fmt.Fprintln(os.Stderr,"Message from known peer")
+		//fmt.Fprintln(os.Stderr,"Message from known peer")
 		//check if new message from known gossiper
 		for index,status := range r.G.currentStatus.Want {
 			if origin == status.Identifer && id == status.NextID{

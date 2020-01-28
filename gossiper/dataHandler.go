@@ -180,3 +180,10 @@ func (g *Gossiper) sendData(bytes []byte, request *utils.DataRequest){
 		g.sendPointToPoint(&utils.GossipPacket{DataReply : reply}, reply.Destination)
 }
 
+
+func (g *Gossiper) deliverContent(initiatorProxies []string){
+
+
+	
+}
+

@@ -12,3 +12,8 @@ type FileInfo struct {
 	Size int64
 	MetafileHash []byte
 }
+
+type Comparable interface{
+	Equals(other Comparable) bool
+}
+

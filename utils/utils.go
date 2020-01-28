@@ -69,3 +69,19 @@ func (b *BlockPublish) Hash() (out [32]byte) {
 func HexToString(hexrepr []byte) string {
 	return hex.EncodeToString(hexrepr)
 }
+
+
+
+func Contains(haystack []Comparable, needle Comparable) bool{
+	for _, result := range haystack {
+		return  result.Equals(needle)
+	}
+	return false
+}
+
+
+
+func (r SearchResult) Equals(other Comparable)bool{
+	v, ok := other.(SearchResult)
+	return ok && r.FileName == v.FileName && hex.EncodeToString(r.MetafileHash) == hex.EncodeToString(v.MetafileHash)
+}

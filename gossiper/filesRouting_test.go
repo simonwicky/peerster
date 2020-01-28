@@ -48,6 +48,9 @@ func createGCSearchReply(origin string, fnames []string)  *utils.GCSearchReply{
 }
 
 func checkArrays(t *testing.T, a1, b1 []string){
+	if len(a1) != len(b1) {
+		t.Errorf("Wrong arrays dimensions %d != %d for arrays %v and %v", len(a1), len(b1), a1, b1 )
+	}
 	for i, a := range a1 {
 		if a != b1[i]{
 			t.Errorf("%s != %s at index %d in arrays %v %v", a, b1[i], i, a1, b1)
@@ -59,11 +62,18 @@ func TestBasicTableUpdates(t *testing.T){
 	table.UpdateRouting(createGCSearchReply("A", []string{"f1", "f2"}))
 	table.UpdateRouting(createGCSearchReply("B", []string{"f32", "f2"}))
 	table.UpdateRouting(createGCSearchReply("A", []string{"f3"}))
+	//Add again to make sure there is no duplicated file
+	table.UpdateRouting(createGCSearchReply("A", []string{"f3"}))
 
+	//t.Log(table.GetAllRoutes())
+
+	t.Log(table.RoutesSorted([]string{"f1"})[0].Routes)
 	assertEqual(t, len(table.GetAllRoutes()), 4)
 	checkArrays(t, table.RoutesSorted([]string{"f1"})[0].Routes,  []string{"A"})
 	checkArrays(t, table.RoutesSorted([]string{"f2"})[0].Routes,  []string{"A", "B"})
 	checkArrays(t, table.RoutesSorted([]string{"f32"})[0].Routes, []string{"B"})
 	checkArrays(t, table.RoutesSorted([]string{"f3", "f32"})[0].Routes, []string{"B"})
+	checkArrays(t, table.RoutesSorted([]string{"f3"})[1].Routes, []string{"A"})
+
 
 }

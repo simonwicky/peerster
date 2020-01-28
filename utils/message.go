@@ -8,6 +8,7 @@ type Message struct {
 	Request *[]byte
 	Budget *uint64
 	Keywords *string
+	GC *bool
 }
 
 type SimpleMessage struct {
@@ -71,11 +72,15 @@ type GCSearchReply struct {
 	Origin string
 	Results []*SearchResult
 	AccessibleFiles []*SearchResult
+	Failure bool
+	HopLimit uint32
 }
 type GCSearchRequest struct {
 	ID uint32
 	Origin string
 	Keywords []string
+	ProxiesIP *[]string
+	HopLimit uint32
 }
 
 
