@@ -229,13 +229,11 @@ func (g *Gossiper) peerGCSearchRequestHandler(packet *utils.GossipPacket){
 			Failure: false,
 			HopLimit:10,
 		}
-		fmt.Println("OOO = ", packet.GCSearchRequest.Origin)
 		g.sendPointToPoint(&utils.GossipPacket{GCSearchReply:reply}, packet.GCSearchRequest.Origin)
 	}
 }
 
 func (g *Gossiper) peerGCSearchReplyHandler(packet *utils.GossipPacket){
-	fmt.Println("received something")
 	g.getGCFileSearcher().receiveReply(packet.GCSearchReply)
 }
 

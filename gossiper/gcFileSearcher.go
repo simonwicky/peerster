@@ -82,18 +82,13 @@ func (s *GCFileSearcher) receiveReply(reply *utils.GCSearchReply){
 	}
 	s.repliesMux.Lock()
 	if channel, ok := s.repliesDispatcher[reply.ID]; ok{
-		fmt.Println("send reply through channel")
 		channel<-reply
 	}
 	s.repliesMux.Unlock()
-	fmt.Println("reply origin ", reply.Origin)
-	//fmt.Printf("Received reply %v", *reply)
-
-
 }
 
 func (s *GCFileSearcher) processReply(channel chan *utils.GCSearchReply, ticker *time.Ticker ){
-	//modularize select in managerequest here
+	//TODO: modularize select in managerequest here
 }
 
 /*
@@ -118,8 +113,6 @@ func (s *GCFileSearcher) manageRequest(searchRequest *utils.GCSearchRequest){
 
 				select{
 					case reply := <- replyChannel:
-						fmt.Println("process reply")
-
 						utils.LogGCSearchReply(reply)
 
 						s.g.FilesRouting.UpdateRouting(reply)
@@ -161,7 +154,6 @@ func (s *GCFileSearcher) manageRequest(searchRequest *utils.GCSearchRequest){
 				if s.SendRequest(*searchRequest, peer){
 					select{
 						case reply := <- replyChannel:
-							fmt.Println("process reply")
 							utils.LogGCSearchReply(reply)
 
 							s.g.FilesRouting.UpdateRouting(reply)

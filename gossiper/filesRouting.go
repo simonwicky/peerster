@@ -57,7 +57,7 @@ func (filesRouting *FilesRouting) RoutesSorted(keywords []string) []FileRoutes {
 
 //Updates the routing table according to the search reply
 func (filesRouting *FilesRouting) UpdateRouting(reply *utils.GCSearchReply){
-	fmt.Println("Update routing")
+	fmt.Println("Update files routing table")
 
 	for _, result := range reply.AccessibleFiles {
 		//if len(result.ChunkMap) == int(result.ChunkCount){
@@ -102,7 +102,7 @@ func (filesRouting *FilesRouting) addRoute(fileInfo utils.FileInfo, route string
 	}else {
 		filesRouting.filesRoutes[utils.HexToString(fileInfo.MetafileHash)] = createFileRoute(fileInfo, []string{route})
 	}
-	fmt.Printf("Added entry %v with route %s", fileInfo, route )
+	//fmt.Printf("Added entry %v with route %s", fileInfo, route )
 
 }
 
@@ -132,8 +132,11 @@ func (filesRouting *FilesRouting) asSearchResults() []*utils.SearchResult{
 func (filesRouting *FilesRouting) dump(){
 	filesRouting.Lock()
 	defer filesRouting.Unlock()
+	fmt.Println("Dump files routing table:")
+	i := 0
 	for _,v := range filesRouting.filesRoutes {
-		fmt.Printf("%s %v",v.FileInfo.Name, v.Routes)
+		i += 1
+		fmt.Printf("%d) %s %v\n",i, v.FileInfo.Name, v.Routes)
 	}
 	return
 }

@@ -219,7 +219,7 @@ func (g *Gossiper) antiEntropy(){
 		g.currentStatus_lock.RLock()
 		g.sendToRandomPeer(&utils.GossipPacket{Status : &g.currentStatus})
 		g.currentStatus_lock.RUnlock()
-		fmt.Fprintln(os.Stderr,"Sending antientropy")
+		//fmt.Fprintln(os.Stderr,"Sending antientropy")
 	}
 }
 
@@ -230,7 +230,7 @@ func (g *Gossiper) rumorRoute() {
 	for {
 		rumor := g.generateRumor("")
 		g.sendToRandomPeer(&utils.GossipPacket{Rumor : &rumor})
-		fmt.Fprintln(os.Stderr,"Sending route rumors.")
+		//fmt.Fprintln(os.Stderr,"Sending route rumors.")
 		_ = <- g.rTimerTicker.C
 	}
 }
