@@ -47,8 +47,6 @@ func (filesRouting *FilesRouting) GetRoutes(metaFileHash string) []string{
 	Routes are sorted on a longest prefix match basis.
 */
 func (filesRouting *FilesRouting) RoutesSorted(keywords []string) []FileRoutes {
-	fmt.Println("Before sort")
-	filesRouting.dump()
 	filesRoutes := filesRouting.GetAllRoutes()
 	filescpy := make([]FileRoutes, len(filesRoutes))
 	copy(filescpy, filesRoutes)
@@ -56,7 +54,6 @@ func (filesRouting *FilesRouting) RoutesSorted(keywords []string) []FileRoutes {
 	sort.Slice(filescpy, func(i, j int) bool {
 		return len(longestMatch(filescpy[i], keywords)) > len(longestMatch(filescpy[j], keywords))
 	})
-	filesRouting.dump()
 	return filescpy
 }
 
@@ -67,7 +64,6 @@ func (filesRouting *FilesRouting) UpdateRouting(reply utils.GCSearchReply){
 
 	for _, result := range reply.AccessibleFiles {
 		//if len(result.ChunkMap) == int(result.ChunkCount){
-			fmt.Println( hex.EncodeToString(result.MetafileHash))
 			fileInfo := utils.FileInfo {
 				Name: result.FileName, 
 				MetafileHash: make([]byte, len(result.MetafileHash)),
@@ -100,9 +96,8 @@ func lcms(fRoute FileRoutes ,keywords []string) string {
 func (filesRouting *FilesRouting) addRoute(fileInfo utils.FileInfo, route string){
 	filesRouting.Lock()
 	defer filesRouting.Unlock()
-	fmt.Println( hex.EncodeToString(fileInfo.MetafileHash))
 
-	if fileRoutes, found := filesRouting.filesRoutes[ hex.EncodeToString(fileInfo.MetafileHash)]; found {
+	if fileRoutes, found := filesRouting.filesRoutes[ fileInfo.Name]; found {
 		for _, r := range fileRoutes.Routes {
 			if r == route {
 				return 
@@ -110,9 +105,7 @@ func (filesRouting *FilesRouting) addRoute(fileInfo utils.FileInfo, route string
 		}
 		fileRoutes.Routes = append(fileRoutes.Routes, route)
 	}else {
-		fmt.Println("wrong",  hex.EncodeToString(fileInfo.MetafileHash))
-
-		filesRouting.filesRoutes[ hex.EncodeToString(fileInfo.MetafileHash)] = createFileRoute(fileInfo, []string{route})
+		filesRouting.filesRoutes[ fileInfo.Name] = createFileRoute(fileInfo, []string{route})
 	}
 	//fmt.Printf("Added entry %v with route %s", fileInfo, route )
 
@@ -151,9 +144,10 @@ func (filesRouting *FilesRouting) dump(){
 	defer filesRouting.Unlock()
 	fmt.Println("Dump files routing table:")
 	i := 0
-	for k,v := range filesRouting.filesRoutes {
+	for _,v := range filesRouting.filesRoutes {
 		i += 1
-		fmt.Printf("%d) %s %v %s %s\n",i, v.FileInfo.Name, v.Routes,  k, hex.EncodeToString(v.FileInfo.MetafileHash))
+		fmt.Printf("%d) %s %v %s\n",i, v.FileInfo.Name, v.Routes, hex.EncodeToString(v.FileInfo.MetafileHash)[:5])
+
 	}
 	return
 }

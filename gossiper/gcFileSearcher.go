@@ -176,6 +176,7 @@ func (s *GCFileSearcher) manageRequest(searchRequest *utils.GCSearchRequest){
 			}
 		}
 	}
+	fmt.Println("Request management done")
 	s.g.FilesRouting.dump()
 	return 
 }	
