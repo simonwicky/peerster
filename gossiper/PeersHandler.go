@@ -46,6 +46,10 @@ func (g *Gossiper) PeersHandle(simple bool) {
 					g.peerSearchRequestHandler(&packet)
 				case packet.SearchReply != nil:
 					g.peerSearchReplyHandler(&packet)
+				case packet.GCSearchRequest != nil:
+					go g.peerGCSearchRequestHandler(&packet)
+				case packet.GCSearchReply != nil:
+					go g.peerGCSearchReplyHandler(&packet)
 				case packet.Rumor != nil || packet.Status != nil:
 					g.peerRumorStatusHandler(&packet, address.String())
 				case packet.TLCMessage != nil:
@@ -238,33 +242,6 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 					utils.LogObj.Fatal(err.Error(), " dropping cloves")
 					return
 				}
-				switch {
-					case simple:
-						g.peerSimpleMessageHandler(&packet)
-					case packet.Private != nil :
-						g.peerPrivateMessageHandler(&packet)
-					case packet.DataRequest != nil :
-						g.peerDataRequestHandler(&packet)
-					case packet.DataReply != nil :
-						g.peerDataReplyHandler(&packet)
-					case packet.SearchRequest != nil :
-						g.peerSearchRequestHandler(&packet)
-					case packet.SearchReply != nil :
-						g.peerSearchReplyHandler(&packet)
-					case packet.GCSearchRequest != nil:
-						go g.peerGCSearchRequestHandler(&packet)
-					case packet.GCSearchReply != nil:
-						go g.peerGCSearchReplyHandler(&packet)
-					case packet.Rumor != nil || packet.Status != nil :
-						g.peerRumorStatusHandler(&packet,address.String())
-					case packet.TLCMessage != nil :
-						g.peerTLCMessageHandler(&packet, address.String())
-					case packet.Ack != nil :
-						g.peerTLCAckHandler(&packet)
-					//case packet.Clove != nil :
-						//g.peerCloveHandler(&packet)
-					default:
-						fmt.Fprintln(os.Stderr,"Message unknown, dropping packet")
 				connect, err := net.DialTCP("tcp", nil, atTcp)
 				if err != nil {
 					utils.LogObj.Fatal(err.Error(), " dropping cloves")
@@ -278,8 +255,8 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 				}
 			case df.Content != nil:
 				//index file
-
 			}
+			
 		} else {
 			data := []string{}
 			for _, clove := range cloves {

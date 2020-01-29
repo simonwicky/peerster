@@ -160,7 +160,7 @@ func (s *GCFileSearcher) manageRequest(searchRequest *utils.GCSearchRequest){
 							
 							if ! reply.Failure{
 								utils.LogGCSearchReply(reply)
-
+								
 								s.g.FilesRouting.UpdateRouting(*reply)
 								for _, newResult := range reply.Results {
 									if !contains(receivedResults, newResult){
@@ -176,7 +176,6 @@ func (s *GCFileSearcher) manageRequest(searchRequest *utils.GCSearchRequest){
 			}
 		}
 	}
-	fmt.Println("Request management done")
 	s.g.FilesRouting.dump()
 	return 
 }	
@@ -194,8 +193,6 @@ func (s *GCFileSearcher) SendRequest(searchRequest utils.GCSearchRequest, peer s
 	}
 
 	fmt.Fprintf(os.Stderr,"Sending Garlic Cast search to %s\n", peer)
-	s.g.FilesRouting.dump()
-
 	s.g.sendToPeer(peer, pkt)
 	return true
 }

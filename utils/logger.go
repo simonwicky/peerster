@@ -3,6 +3,7 @@ package utils
 import (
 	"fmt"
 	"strings"
+	"encoding/hex"
 )
 
 func LogRumor(packet *RumorMessage, address string){

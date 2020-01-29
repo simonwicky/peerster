@@ -96,7 +96,7 @@ func send(packet *utils.Message, addr string) {
 	}
 	n, _ := conn.Write(packetBytes)
 
-	//fmt.Fprintln(os.Stderr,"Packet sent to " + udpAddr.String() + " size: ",n)
+	fmt.Fprintln(os.Stderr,"Packet sent to " + udpAddr.String() + " size: ",n)
 	return
 
 }

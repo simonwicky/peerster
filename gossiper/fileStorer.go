@@ -234,11 +234,10 @@ func (fs *FileStorage) asSearchResults()[]*utils.SearchResult{
 	for _, fd := range fs.data {
 		result := &utils.SearchResult{
 			FileName: fd.name,
-			MetafileHash: fd.metafileHash,
+			MetafileHash: make([]byte, len(fd.metafileHash)),
 			ChunkCount: uint64(fd.size / int64(2 << 12)),
 		}
-		fmt.Println("build ",  hex.EncodeToString(result.MetafileHash))
-
+		copy(result.MetafileHash, fd.metafileHash)
 		results = append(results,result)
 	}
 	return results

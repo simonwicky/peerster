@@ -55,8 +55,6 @@ func (g *Gossiper) ClientHandle(simple bool){
 			}
 
 		}
-
-	}
 }
 
 func (g *Gossiper) clientSimpleMessageHandler(message *utils.Message) {

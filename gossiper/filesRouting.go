@@ -47,11 +47,12 @@ func (filesRouting *FilesRouting) GetRoutes(metaFileHash string) []string{
 	Routes are sorted on a longest prefix match basis.
 */
 func (filesRouting *FilesRouting) RoutesSorted(keywords []string) []FileRoutes {
+	fmt.Println("Before sort")
+	filesRouting.dump()
 	filesRoutes := filesRouting.GetAllRoutes()
 	filescpy := make([]FileRoutes, len(filesRoutes))
 	copy(filescpy, filesRoutes)
-	fmt.Println("Before sort")
-	filesRouting.dump()
+
 	sort.Slice(filescpy, func(i, j int) bool {
 		return len(longestMatch(filescpy[i], keywords)) > len(longestMatch(filescpy[j], keywords))
 	})
@@ -69,7 +70,7 @@ func (filesRouting *FilesRouting) UpdateRouting(reply utils.GCSearchReply){
 			fmt.Println( hex.EncodeToString(result.MetafileHash))
 			fileInfo := utils.FileInfo {
 				Name: result.FileName, 
-				MetafileHash: result.MetafileHash,
+				MetafileHash: make([]byte, len(result.MetafileHash)),
 			}
 			copy(fileInfo.MetafileHash, result.MetafileHash)
 			filesRouting.addRoute(fileInfo, reply.Origin)
@@ -134,10 +135,11 @@ func (filesRouting *FilesRouting) asSearchResults() []*utils.SearchResult{
 	for _,fileRoute := range filesRouting.filesRoutes{
 		result := &utils.SearchResult{
 			FileName: fileRoute.FileInfo.Name,
-			MetafileHash: fileRoute.FileInfo.MetafileHash,
+			MetafileHash: make([]byte, len(fileRoute.FileInfo.MetafileHash)),
 			ChunkCount: uint64(fileRoute.FileInfo.Size / int64(2 << 12)),
 		}
-		fmt.Println( "comparison", hex.EncodeToString(result.MetafileHash), hex.EncodeToString(fileRoute.FileInfo.MetafileHash))
+		copy(result.MetafileHash, fileRoute.FileInfo.MetafileHash)
+
 
 		results = append(results,result)
 	}
