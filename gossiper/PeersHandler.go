@@ -213,7 +213,7 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 			case df.Proxy != nil:
 				if df.Proxy.Forward {
 					if df.Proxy.SessionKey == nil {
-						output, err := utils.NewProxyAccept().Split(2, 2)
+						output, err := utils.NewProxyAccept(g.directProxyPort).Split(2, 2)
 						if err == nil {
 							//accept to be a proxy
 							for i, path := range paths {
@@ -229,7 +229,9 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 					var fixPaths [2]string
 					copy(fixPaths[:], paths[:2])
 					// record proxy and send session key
-					g.newProxies <- &Proxy{Paths: fixPaths}
+					if df.Proxy.IP != nil {
+						g.newProxies <- &Proxy{Paths: fixPaths, IP: *df.Proxy.IP, SessionKey: *df.Proxy.SessionKey}
+					}
 				}
 			case df.Delivery != nil: // this is read by a provider proxy
 				//directly connect by TCP to proxy provided

@@ -161,8 +161,8 @@ func NewProxyInit() *DataFragment {
 	return &DataFragment{Proxy: &ProxyRequest{Forward: true}}
 }
 
-func NewProxyAccept() *DataFragment {
-	return &DataFragment{Proxy: &ProxyRequest{Forward: false}}
+func NewProxyAccept(ip string) *DataFragment {
+	return &DataFragment{Proxy: &ProxyRequest{Forward: false, IP: &ip}}
 }
 
 /*
@@ -200,6 +200,7 @@ func (df *DataFragment) Split(k uint, n uint) ([]*Clove, error) {
 
 type ProxyRequest struct {
 	Forward    bool
+	IP         *string
 	SessionKey *[]byte
 }
 

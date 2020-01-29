@@ -260,6 +260,7 @@ type Proxy struct {
 	Paths      [2]string
 	SessionKey []byte
 	ProxySN    []byte
+	IP         string
 }
 
 /*
