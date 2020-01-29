@@ -12,7 +12,10 @@ app.post('/', function (req, res) {
         console.info(`spawning ${prog} ${args}`)
         return spawn(prog, args.concat(['-filter', 'rec', 'init']))
     })
-    children.forEach(child => child.stdout.on('data', chunk => console.log(chunk.toString())))
+    children.forEach(child => {
+        child.stdout.on('data', chunk => console.log(chunk.toString()))
+        child.stderr.on('data', line => console.error(line.toString()))
+    })
     //children[0].stderr.on('data', line => console.error(line.toString()))
 })
 app.get('/proxies/:port', async (req, res) => {

@@ -114,6 +114,14 @@ type Clove struct {
 	AssociatedData []byte // for 2-threshold data only; threshold is assumed to be 2 and index is % 2 + 1
 }
 
+type DumbClove struct {
+	Index          uint32
+	Threshold      uint32
+	SequenceNumber string
+	Data           string
+	AssociatedData []byte // for 2-threshold data only; threshold is assumed to be 2 and index is % 2 + 1
+}
+
 /*
 Wrap wraps a clove into a gossipPacket
 */
@@ -188,7 +196,7 @@ func (df *DataFragment) Split(k uint, n uint) ([]*Clove, error) {
 	if err != nil {
 		return nil, err
 	}
-	sn := make([]byte, 8)
+	sn := make([]byte, 32)
 	rand.Read(sn)
 	cloves := make([]*Clove, len(secrets))
 	for i, secret := range secrets {

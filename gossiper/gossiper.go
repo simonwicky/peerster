@@ -174,12 +174,6 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		rTimerTicker = time.NewTicker(duration)
 	}
 
-	if peersNumber == 0 {
-		fmt.Println(peers)
-		fmt.Fprintln(os.Stderr, "Number of peers should be > 0")
-		return nil
-	}
-
 	g := &Gossiper{
 		addressPeer:       udpAddrPeer,
 		connPeer:          udpConnPeer,

@@ -315,7 +315,7 @@ class App extends React.Component {
             <Button variant="danger" onClick={this.run}>Run</Button>
           </Navbar.Collapse>
         </Navbar>
-        <Network style={{height: '600px'}}>
+        <Network style={{height: '800px'}}>
           {this.state.nodes.map(node => <Node label={node} decorator={() => <Decorator test={this.test(node)}/>} id={node} />)}
           {this.state.edges.map(([u, v], i) => {
             return <Edge id={i} from={u}  to={v} />
