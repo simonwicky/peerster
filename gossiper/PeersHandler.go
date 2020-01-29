@@ -3,6 +3,7 @@ package gossiper
 import (
 	"fmt"
 	"math/rand"
+	"net"
 	"os"
 	"runtime"
 	"time"
@@ -31,30 +32,31 @@ func (g *Gossiper) PeersHandle(simple bool) {
 			err = protobuf.Decode(packetBytes[:n], &packet)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err.Error())
-			}
-			switch {
-			case simple:
-				g.peerSimpleMessageHandler(&packet)
-			case packet.Private != nil:
-				g.peerPrivateMessageHandler(&packet)
-			case packet.DataRequest != nil:
-				g.peerDataRequestHandler(&packet)
-			case packet.DataReply != nil:
-				g.peerDataReplyHandler(&packet)
-			case packet.SearchRequest != nil:
-				g.peerSearchRequestHandler(&packet)
-			case packet.SearchReply != nil:
-				g.peerSearchReplyHandler(&packet)
-			case packet.Rumor != nil || packet.Status != nil:
-				g.peerRumorStatusHandler(&packet, address.String())
-			case packet.TLCMessage != nil:
-				g.peerTLCMessageHandler(&packet, address.String())
-			case packet.Ack != nil:
-				g.peerTLCAckHandler(&packet)
-			case packet.Clove != nil:
-				g.clovesCollector.handler <- IncomingClove{predecessor: address.String(), clove: packet.Clove}
-			default:
-				fmt.Fprintln(os.Stderr, "Message unknown, dropping packet")
+			} else {
+				switch {
+				case simple:
+					g.peerSimpleMessageHandler(&packet)
+				case packet.Private != nil:
+					g.peerPrivateMessageHandler(&packet)
+				case packet.DataRequest != nil:
+					g.peerDataRequestHandler(&packet)
+				case packet.DataReply != nil:
+					g.peerDataReplyHandler(&packet)
+				case packet.SearchRequest != nil:
+					g.peerSearchRequestHandler(&packet)
+				case packet.SearchReply != nil:
+					g.peerSearchReplyHandler(&packet)
+				case packet.Rumor != nil || packet.Status != nil:
+					g.peerRumorStatusHandler(&packet, address.String())
+				case packet.TLCMessage != nil:
+					g.peerTLCMessageHandler(&packet, address.String())
+				case packet.Ack != nil:
+					g.peerTLCAckHandler(&packet)
+				case packet.Clove != nil:
+					g.clovesCollector.handler <- IncomingClove{predecessor: address.String(), clove: packet.Clove}
+				default:
+					fmt.Fprintln(os.Stderr, "Message unknown, dropping packet")
+				}
 			}
 		}
 	}
@@ -83,11 +85,12 @@ but not store many of the same exact cloves from the same exact predecessor
 */
 type ClovesCollector struct {
 	handler chan IncomingClove
+	directs chan *utils.Clove
 	cloves  map[string]map[string]map[uint32]*utils.Clove
 }
 
 func NewClovesCollector(g *Gossiper) *ClovesCollector {
-	cc := &ClovesCollector{handler: make(chan IncomingClove), cloves: make(map[string]map[string]map[uint32]*utils.Clove)}
+	cc := &ClovesCollector{handler: make(chan IncomingClove), directs: make(chan *utils.Clove), cloves: make(map[string]map[string]map[uint32]*utils.Clove)}
 	cc.manage(g)
 	return cc
 }
@@ -130,13 +133,11 @@ func (cc *ClovesCollector) MeetsThreshold(sn string, k uint32) (bool, []*utils.C
 			ids, paths, cover := pathsCovered(seq, k)
 			return getKIndependentCloves(k, seq, paths, ids, cover, make([]*utils.Clove, 0), []string{})
 		}
-		// there are less paths than
-		return false, []*utils.Clove{}, []string{}
-	} else {
-		utils.LogObj.Fatal("sequence number ", sn, " not found")
+		// there are less paths than k
 		return false, []*utils.Clove{}, []string{}
 	}
-
+	utils.LogObj.Fatal("sequence number ", sn, " not found")
+	return false, []*utils.Clove{}, []string{}
 }
 
 func pathsCovered(seq map[string]map[uint32]*utils.Clove, k uint32) ([]uint32, map[string]bool, map[uint32][]string) {
@@ -230,8 +231,27 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 					// record proxy and send session key
 					g.newProxies <- &Proxy{Paths: fixPaths}
 				}
-			case df.Content != nil:
+			case df.Delivery != nil: // this is read by a provider proxy
 				//directly connect by TCP to proxy provided
+				atTcp, err := net.ResolveTCPAddr("tcp", df.Delivery.IP)
+				if err != nil {
+					utils.LogObj.Fatal(err.Error(), " dropping cloves")
+					return
+				}
+				connect, err := net.DialTCP("tcp", nil, atTcp)
+				if err != nil {
+					utils.LogObj.Fatal(err.Error(), " dropping cloves")
+					return
+				}
+				for _, dataClove := range df.Delivery.Cloves {
+					_, err := connect.Write(dataClove)
+					if err != nil {
+						utils.LogObj.Fatal(err.Error())
+					}
+				}
+			case df.Content != nil:
+				//index file
+
 			}
 		} else {
 			data := []string{}
@@ -264,6 +284,8 @@ func (cc *ClovesCollector) manage(g *Gossiper) {
 	go func() {
 		for {
 			select {
+			//case clove := <-cc.directs:
+			// look up "cloves routing table" and forward
 			case newClove := <-cc.handler:
 				cc.cloveHandler(g, newClove.clove, newClove.predecessor)
 			case <-time.After(15 * time.Second):

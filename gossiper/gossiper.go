@@ -106,6 +106,7 @@ type Gossiper struct {
 	settings        *Settings
 	proxyPool       *ProxyPool
 	clovesCollector *ClovesCollector
+	directProxyPort string
 }
 
 func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer, hoplimit, peersNumber, stubbornTimeout int, hw3ex2, hw3ex3, hw3ex4 bool) *Gossiper {
@@ -382,7 +383,33 @@ func (g *Gossiper) Start(simple bool, port string) {
 	go g.rumorRoute()
 	go g.HttpServerHandler(port)
 	go g.initiator(3, g.knownPeers, nil)
+	go g.proxySrv()
 	g.PeersHandle(simple)
+}
+
+func (g *Gossiper) proxySrv() {
+	var buf []byte = make([]byte, 8000)
+	atTCP, err := net.ResolveTCPAddr("tcp", g.directProxyPort)
+	if err != nil {
+		utils.LogObj.Fatal(err.Error(), " dropping cloves")
+		return
+	}
+	connect, err := net.DialTCP("tcp", nil, atTCP)
+	for {
+		_, err := connect.Read(buf)
+		if err == nil {
+			var clove utils.Clove
+			err = protobuf.Decode(buf, &clove)
+			if err == nil {
+				// forward clove to clove handler
+				g.clovesCollector.directs <- &clove
+			} else {
+				utils.LogObj.Fatal(err.Error())
+			}
+		} else {
+			utils.LogObj.Fatal(err.Error())
+		}
+	}
 }
 
 func (g *Gossiper) antiEntropy() {
