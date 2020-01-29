@@ -19,8 +19,10 @@ import InputGroup from 'react-bootstrap/InputGroup'
 import Nav from 'react-bootstrap/Nav'
 import NavDropdown from 'react-bootstrap/NavDropdown'
 import FormControl from 'react-bootstrap/FormControl'
+import Toast from 'react-bootstrap/Toast'
 import { Network, Node, Edge } from 'react-vis-network'
-
+import Double from './components/Double'
+import Create from './components/Create'
 function makeid(length) {
   var result           = '';
   var characters       = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -31,52 +33,52 @@ function makeid(length) {
   return result;
 }
 
-const Create = (props) => (
-  /*
-  <Nav className="mr-auto">
-      <Nav.Link href="#home">Home</Nav.Link>
-      <Nav.Link href="#link">Link</Nav.Link>
-      <NavDropdown title="Dropdown" id="basic-nav-dropdown">
-        <NavDropdown.Item href="#action/3.1">Action</NavDropdown.Item>
-        <NavDropdown.Item href="#action/3.2">Another action</NavDropdown.Item>
-        <NavDropdown.Item href="#action/3.3">Something</NavDropdown.Item>
-        <NavDropdown.Divider />
-        <NavDropdown.Item href="#action/3.4">Separated link</NavDropdown.Item>
-      </NavDropdown>
-    </Nav>
-  */
-    <Form inline>
-      <FormControl type="text" placeholder="Name" className="mr-sm-2" onChange={e => props.update(e.target.value)} />
-    </Form>
-)
 
-const Connect = (props) => (
-  <InputGroup>
-    <FormControl type="text" placeholder="Name"  />
-    <InputGroup.Text><FontAwesomeIcon icon={faLongArrowAltRight} /></InputGroup.Text>
-    <FormControl type="text" placeholder="Name"  />
-  </InputGroup>
-)
-
-class Double extends React.Component {
+class ProxyToasts extends React.Component {
   state = {
-    a: '',
-    b: '',
+    proxies: new Map(),
+  }
+  componentDidUpdate = (prevProps, prevState, snapshot) => {
+    const prev = new Set(prevProps.nodes)
+    const updatables = this.props.nodes.filter(node => !prev.has(node))
+    if(this.props.map) {
+      updatables.forEach(updatable => {
+        if (this.props.map.has(updatable)) {
+          console.log(`http://localhost:${this.props.map.get(updatable).httpPort}/proxies`)
+          fetch(`http://localhost:${this.props.map.get(updatable).httpPort}/proxies`)
+          .then(res => res.json())
+          .then(proxies => console.log(proxies)).catch(err => 'couldnt fetch proxies')
+        }
+      })
+    }
+    
   }
   render = () => (
-  <InputGroup>
-    <FormControl type="text" placeholder="Name" value={this.state.a} onChange={e => {
-      const val = e.target.value
-      this.props.update([val, this.state.b])
-      this.setState({a: val})
-    }} />
-    <InputGroup.Text><FontAwesomeIcon icon={this.props.icon} /></InputGroup.Text>
-    <FormControl type="text" placeholder="Name" value={this.state.b} onChange={e => {
-      const val = e.target.value
-      this.props.update([this.state.a, val])
-      this.setState({b: val})
-    }} />
-  </InputGroup>
+      <div
+        aria-live="polite"
+        aria-atomic="true"
+        style={{
+          minHeight: '200px', //positon relative
+        }}
+      >
+        <div
+          style={{
+            position: 'absolute',
+            top: 60,
+            right: 16,
+          }}
+        >
+          {this.props.nodes.map((node, i) => (
+            <Toast onClose={e => this.props.untest(node)} style={{width: 300}} >
+              <Toast.Header>
+                <strong className="mr-auto">{node}</strong>
+                <small>just now</small>
+              </Toast.Header>
+              <Toast.Body>See? Just like this.</Toast.Body>
+            </Toast>
+          ))}
+        </div>
+      </div>
   )
 }
 
@@ -104,7 +106,7 @@ const CustomIcon = ({ icon, color = '#5596ed' }) => {
  
 const Decorator = props => {
   return (
-      <Button variant="outline-secondary">
+      <Button variant="outline-secondary" onClick={props.test}>
         <FontAwesomeIcon icon={faDatabase} />
         </Button>
       
@@ -123,7 +125,7 @@ class Gen {
 }
 let gossipPort = new Gen(5000)
 let uiPort = new Gen(7000)
-let httpPort = new Gen(8080)
+let httpPort = new Gen(8000)
 let N = new Gen(0)
 class Peerster {
   constructor(name) {
@@ -138,9 +140,9 @@ class Peerster {
   knows = (neighbour) => {
     this.peers.add(neighbour)
   }
-  cmd = () => `./peerster -name ${this.name} -gossipAddr ${this.gossipAddr} -UIPort ${this.uiport} ${this.peerStr()} -N ${N.get()}`
+  cmd = () => `./peerster -name ${this.name} -gossipAddr ${this.gossipAddr} -UIPort ${this.uiport} ${this.peerStr()} -N ${N.get()} -GUIPort ${this.httpPort}`
 }
-
+//id="dropdown-menu-align-right"
 class App extends React.Component {
   actions = {
     'Create': <Create update={(name) => {
@@ -154,10 +156,21 @@ class App extends React.Component {
     }}/>,
   }
   state = {
+    tested: new Set(),
     input: null,
     nodes: [],
     edges: [],
     action: 'Create',
+    objs: new Map(),
+  }
+  reset = () => {
+    this.setState({
+      tested: new Set(),
+      input: null,
+      nodes: [],
+      edges: [],
+      objs: new Map(),
+    })
   }
   connect = (nodeA, nodeB) => {
     const k = 2
@@ -168,7 +181,7 @@ class App extends React.Component {
     const edges = this.state.edges
     const repr = (a, b) => (a < b) ? `${a}${b}` : `${b}${a}`
     const add = (a, b) => {
-      if(!set.has(repr(a, b))) {
+      if(!set.has(repr(a, b)) && a != b) {
         edges.push([a, b])
         set.add(repr(a, b))
       } 
@@ -235,12 +248,24 @@ class App extends React.Component {
     this.state.edges.forEach(([u, v]) => nodes.get(u).knows(nodes.get(v)))
     const cmds = []
     nodes.forEach(v => cmds.push(v.cmd()))
+    console.log(cmds)
     const query = JSON.stringify({cmds:cmds})
     fetch('http://localhost:3000/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: query,
     })
+    this.setState({objs: nodes})
+  }
+  test = node => () => {
+    const tested = this.state.tested
+    tested.add(node)
+    this.setState({tested: tested})
+  }
+  untest = node => {
+    const tested = this.state.tested
+    tested.delete(node)
+    this.setState({tested: tested})
   }
   render = () => {
     //<Button onClick={e => this.connect('Alice', 'Bob')}>Gen</Button>
@@ -261,28 +286,22 @@ class App extends React.Component {
               onClick={this.do}
             >
               {['Create', 'Connect', 'Generate'].map((act, i) => <Dropdown.Item onClick={e => this.setState({action: act})} eventKey={i}>{act}</Dropdown.Item>)}
-              
+              <Dropdown.Divider />
+              <Dropdown.Item onClick={this.reset}>Reset</Dropdown.Item>
             </SplitButton>
             <Button variant="danger" onClick={this.run}>Run</Button>
           </Navbar.Collapse>
         </Navbar>
         <Network style={{height: '600px'}}>
-          {this.state.nodes.map(node => <Node label={node} decorator={Decorator} id={node} onClick={e => console.log(`${node} clicked`)}/>)}
+          {this.state.nodes.map(node => <Node label={node} decorator={() => <Decorator test={this.test(node)}/>} id={node} />)}
           {this.state.edges.map(([u, v], i) => {
             return <Edge id={i} from={u}  to={v} />
           })}
         </Network>
+        <ProxyToasts nodes={[...this.state.tested]} untest={this.untest} map={this.state.objs} />
       </div>
     )
   }
 }
-
-/*
-<Node id="vader" label="Darth Vader" />
-          <Node id="luke" label="Luke Skywalker" />
-          <Node id="leia" label="Leia Organa" />
-          <Edge id="1" from="vader" to="luke" />
-          <Edge id="2" from="vader" to="leia" />
-*/
 
 export default App;

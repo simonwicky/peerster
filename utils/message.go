@@ -111,6 +111,7 @@ type Clove struct {
 	Threshold      uint32
 	SequenceNumber []byte
 	Data           []byte
+	AssociatedData []byte // for 2-threshold data only; threshold is assumed to be 2 and index is % 2 + 1
 }
 
 /*
@@ -127,9 +128,10 @@ DataFragment is a generic type to hold data that can be split to cloves
 	@SessionKey - reserved to send the session key at the end of the
 */
 type DataFragment struct {
-	Proxy   *ProxyRequest
-	Query   *Query
-	Content *Content
+	Proxy    *ProxyRequest
+	Query    *Query
+	Content  *Content
+	Delivery *Delivery
 }
 
 /*
@@ -206,7 +208,16 @@ type Query struct {
 }
 
 type Content struct {
+	Key  []byte
 	Data []byte
+}
+
+/*
+Content describes file delivery
+*/
+type Delivery struct {
+	IP     string    // the provider only sends one initiator proxy per provider proxy
+	Cloves [2][]byte // 2 protobofed(or other byte representation) cloves (because Delivery is meant to be split by 2-threshold)
 }
 
 type GossipPacket struct {

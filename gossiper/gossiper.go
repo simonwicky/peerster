@@ -1,6 +1,8 @@
 package gossiper
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -21,6 +23,7 @@ type Settings struct {
 	Buffering      uint
 	Redundancy     uint          // number of cloves sent for any threshold
 	DiscoveryRate  time.Duration // period of proxy discovery
+	Connectivity   uint          // d used in the paper = number of proxies for search for example
 }
 
 type Gossiper struct {
@@ -208,8 +211,8 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		settings: &Settings{
 			SessionKeySize: 32,
 			Buffering:      10,
-			Redundancy:     10,
-			DiscoveryRate:  8,
+			Redundancy:     3,
+			DiscoveryRate:  4,
 		},
 		newProxies: make(chan *Proxy),
 		proxyPool:  &ProxyPool{proxies: make([]*Proxy, 0)},
@@ -246,7 +249,7 @@ func getTuple(n uint, pathsTaken map[string]bool, peers []string) ([]string, map
 			}
 		}
 	}
-	return tuple[:i], pathsTaken, fmt.Errorf("Not enough available paths!")
+	return tuple[:i], pathsTaken, fmt.Errorf("Not enough available paths in", peers, "of", pathsTaken, "!")
 }
 
 /*
@@ -309,14 +312,16 @@ initiate creates a new proxy init message,
 splits it in n cloves, gets n paths from the known peers
 and sends a clove to each path
 */
-func (g *Gossiper) initiate(knownPeers []string, pathsTaken map[string]bool) map[string]bool {
+func (g *Gossiper) initiate(pathsTaken map[string]bool) map[string]bool {
+	knownPeers := g.knownPeers
+	series := utils.LogObj.Named("series")
 	tuple, pathsStillAvailable, err := getTuple(g.settings.Redundancy, pathsTaken, knownPeers)
 	if err == nil {
 		cloves, err := utils.NewProxyInit().Split(2, g.settings.Redundancy)
 		//test
 		if err == nil {
 			for i, clove := range cloves {
-				utils.LogObj.Named("init").Debug("sending to ", tuple[i], clove.Data)
+				series.Debug(string(clove.SequenceNumber), "(", i, ") = ", string(clove.Data))
 				g.sendToPeer(tuple[i], clove.Wrap())
 			}
 		} else {
@@ -338,19 +343,16 @@ BIG QUESTION: is it enough to take distincts pairs or do _ALL_ the paths have to
 */
 func (g *Gossiper) initiator(n uint, peersAtBootstrap []string, peersUpdates chan []string) {
 	logger := utils.LogObj.Named("init")
-	knownPeers := peersAtBootstrap
 	pathsTaken := map[string]bool{}
 	pool := g.proxyPool
-	g.initiate(knownPeers, pathsTaken)
+	g.initiate(pathsTaken)
 	ini := time.NewTicker(time.Second * g.settings.DiscoveryRate)
 	for {
 		select {
 		case <-ini.C:
 			pathsTaken = pool.Cover()
 			//initiate proxy search
-			pathsTaken = g.initiate(knownPeers, pathsTaken)
-		case peersUpdate := <-peersUpdates:
-			knownPeers = peersUpdate
+			pathsTaken = g.initiate(pathsTaken)
 		case newProxy := <-g.newProxies:
 			logger.Debug("New proxy")
 			pool.Add(newProxy)
@@ -847,4 +849,96 @@ func (g *Gossiper) incrementTLCRound() {
 	g.TLC_round_counter_lock.Lock()
 	g.TLC_round_counter += 1
 	g.TLC_round_counter_lock.Unlock()
+}
+
+/*
+NewContent creates a new deliverable content
+*/
+func NewDeliveries(data []byte, initiatorProxies []string, k, nPrime uint) ([]*utils.DataFragment, error) {
+	//assert len(initiatorProxies) == nPrime / 2
+	dPrime := nPrime / 2
+	deliveries := make([]*utils.DataFragment, dPrime)
+	// assert nPrime is even
+	content, err := NewContent(data)
+	if err != nil {
+		return nil, err
+	}
+	contentCloves, err := content.Split(k, nPrime)
+	if err != nil {
+		return nil, err
+	}
+	for i := 0; i < int(dPrime); i++ {
+		encodedCloves := [2][]byte{}
+		for j := 0; j < 2; j++ {
+			encoded, err := protobuf.Encode(contentCloves[i+j])
+			if err != nil {
+				return nil, err
+			}
+			encodedCloves[j] = encoded
+		}
+		delivery := &utils.Delivery{IP: initiatorProxies[i], Cloves: encodedCloves}
+		deliveries[i] = &utils.DataFragment{Delivery: delivery}
+	}
+	//cihpherText := gcm.Seal(nonce, nonce, data, nil)
+	// data is
+	return deliveries, nil
+}
+
+func NewContent(data []byte) (*utils.DataFragment, error) {
+	//generate a key K
+	key := make([]byte, 32) // needs to be 32 bytes?
+	_, err := rand.Read(key)
+	if err != nil {
+		return nil, err
+	}
+	encrypter, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	//encrypt F with AES K
+	//encrypt
+	cbc := cipher.NewCBCEncrypter(encrypter, []byte(utils.AES_IV))
+	cipherText := make([]byte, len(data))
+	cbc.CryptBlocks(cipherText, data)
+	df := &utils.DataFragment{Content: &utils.Content{
+		Key:  key,
+		Data: cipherText,
+	}}
+	return df, nil
+}
+
+func (g *Gossiper) deliver(filename string, proxies []string) {
+	logger := utils.LogObj.Named("delivery")
+	d := uint(len(proxies))
+	//get file from filestorage
+	providerProxies, err := g.proxyPool.GetD(d)
+	if err != nil {
+		logger.Fatal(err.Error())
+		return
+	}
+	file, ok := g.fileStorage.data[filename]
+	if !ok {
+		return
+	}
+	n := 2 * d
+	deliveries, err := NewDeliveries(file.data, proxies, 4, n)
+	if err != nil {
+		logger.Fatal(err.Error())
+		return
+	}
+	for i, delivery := range deliveries {
+		cloves, err := delivery.Split(2, 2) // normally we should collect all cloves to make sure that no error occurs
+		if err != nil {
+			logger.Fatal(err.Error())
+			return
+		}
+		for j, clove := range cloves {
+			g.sendToPeer(providerProxies[i].Paths[j], clove.Wrap())
+		}
+	}
+	//split F
+	//split K
+
+	//generate sequence number
+
 }

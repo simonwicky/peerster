@@ -221,7 +221,7 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 							}
 						}
 					} else {
-						// register session key
+						// register session key and id
 						logger.Debug("registering session key")
 					}
 				} else {
@@ -230,6 +230,8 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 					// record proxy and send session key
 					g.newProxies <- &Proxy{Paths: fixPaths}
 				}
+			case df.Content != nil:
+				//directly connect by TCP to proxy provided
 			}
 		} else {
 			data := []string{}
@@ -264,7 +266,7 @@ func (cc *ClovesCollector) manage(g *Gossiper) {
 			select {
 			case newClove := <-cc.handler:
 				cc.cloveHandler(g, newClove.clove, newClove.predecessor)
-			case <-time.After(10 * time.Second):
+			case <-time.After(15 * time.Second):
 				logger.Debug("clearing cloves", len(cc.cloves))
 				cc.cloves = make(map[string]map[string]map[uint32]*utils.Clove)
 				runtime.GC()

@@ -28,8 +28,11 @@ object Hello extends App {
     val gossip = Counter(6001)
     val ui = Counter(7000)
     var n = Counter(0)
+    val ignore: String => Unit = (line: String) => {
+            
+        }
     case class Peerster(val name: String) {
-        var peers: List[String] = Nil
+        var peers: Set[String] = Set()
         var filters = List[String]()
         val uip = ui.next
         val gossipAddr = s"127.0.0.1:${gossip.next}"
@@ -38,7 +41,7 @@ object Hello extends App {
         def fs = if(filters.size > 0) s"-filter ${filters mkString ","}" else ""
         def cmd = s"./peerster -name $name -UIPort $uip -gossipAddr $gossipAddr -N $n $ps $fs"
         def knows(peerster: Peerster): Peerster = {
-            peers = peerster.gossipAddr :: peers
+            peers = peers + peerster.gossipAddr
             this
         }
         def -(filter: String) = {
@@ -79,33 +82,15 @@ object Hello extends App {
             subNetwork.toList
         }
         def run(f: String => String => Unit): Future[String] = {
-            println(s"$name running on $gossipAddr...")
+            println(s"$cmd")
             Future[String] {
                 val fn = f(name)
-                cmd ! ProcessLogger(fn, err => println(s"$name panic-ed"))
+                cmd ! ProcessLogger(fn, err => if(err contains "panic:") println(Console.RED+"$"+name+Console.WHITE+s"> $err"))
                 s"$name done"
             }
         }
         override def toString: String = cmd
     }
-    //val result: Unit = "ls -al".!
-    //val contents = Process("ls").lazyLines
-    /*val alice = Peerster("Alice")
-    val bob = Peerster("Bob")
-    val charlie = Peerster("Charlie")
-    val dave = Peerster("Dave")
-    val eve = Peerster("Eve")
-    val jack = Peerster("Jack")
-    alice.knows(bob).knows(charlie).knows(eve)
-    bob knows dave
-    charlie knows dave
-    eve knows jack
-    jack knows dave
-    val peersters = List(alice, bob, charlie, dave, eve, jack)
-    val f = peersters map {case p: Peerster => p.run(line => println(s"${p.name}> $line"))}
-    f foreach { posts =>
-    for (post <- posts) println(post)
-}*/
     val alice = Peerster("Alice")
     val bob = Peerster("Bob")
     val charlie = Peerster("Charlie")
@@ -113,29 +98,35 @@ object Hello extends App {
     val eve = Peerster("Eve")
     val jack = Peerster("Jack")
     val robert = Peerster("Robert")
-    alice.knows(bob).knows(charlie)
+    val amandine = Peerster("Amandine")
+    /*alice.knows(bob).knows(charlie)
     bob -> dave
     charlie -> dave
     eve -> jack
     jack -> dave
     val sub1 = alice ~> eve
     val sub2 = alice ~~~> robert
+    val sub3 = alice ~~~> amandine
+    amandine -> robert
     alice - "init"
+    alice - "series"
+    alice - "fwd"
+    alice - "rec"
     def testAliceFindsOneProxy = {
-        val peersters = List(alice, bob, charlie, dave, eve, jack, robert) ++ sub1 ++ sub2
+        val peersters = List(alice, bob, charlie, dave, eve, jack, robert) ++ sub1 ++ sub2 ++ sub3
         val aliceHasSendingTo: String => String => Unit = (name: String) => (line: String) => {
-            //println(line)
             if(line contains "proxy") {
                 println("[SUCCESS]")
                 System exit 0
             }
         }
-        val aliceHasMultipleProxies: String => String => Unit = (name: String) => {
+        val hasMultipleProxies: String => String => Unit = (name: String) => {
             var cnt = 0
             (line: String) => {
-                println(s"${"$"}$name> $line")
+                if (line contains "FATAL") println(line)
                 if (line contains "proxy") {
                     println("one proxy added!")
+                    cnt += 1
                 }
                 if(cnt >= 1) {
                     println("[SUCCESS]")
@@ -143,19 +134,21 @@ object Hello extends App {
                 }
             }
         }
-        val ignore:String =>  String => Unit = (name: String) => (line: String) => {
-            
-        }
+        
         val printFatals: String => String => Unit = (name: String) => (line: String) => {
-            if (line contains "FATAL") {
+            if (line.contains( "FATAL" )|| line.contains( "WARN")) {
                 println(s"$name> $line")
             }
         }
         //create map instead
-        val testCases: List[String => String => Unit] = List(aliceHasMultipleProxies) ++ 1.until(peersters.size).map(i => ((s: String) => printFatals(s)))
+        val testCases: List[String => String => Unit] = List(hasMultipleProxies) ++ 1.until(peersters.size)
+        .map(i => ((s: String) => printFatals(s)))
         //"go build" !
         //put timeout instead
         peersters.zip(testCases) map { case (p, fn) => p.run(fn) } foreach { case f => Await.result(f, Duration.Inf)}
     }
-    testAliceFindsOneProxy
+    
+    "go build"!ProcessLogger(ignore, ignore)
+    testAliceFindsOneProxy*/
+    alice run ((x: String) => (y: String) => {})
 }

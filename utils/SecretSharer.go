@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 	"os"
@@ -58,17 +57,17 @@ import (
 // }
 
 func recoverSecret(data [][]byte, pointX []int) ([]byte, error) {
-	if len(data) != len(pointX) {
+	/*if len(data) != len(pointX) {
 		return nil, errors.New("data and pointX do not match")
-	}
+	}*/
 	var result_data []*big.Int
 	points := make(map[int]*big.Int)
 
 	for i := 0; i < len(data[0])/SIZE; i++ {
 		for j := 0; j < len(pointX); j++ {
-			if len(data[j]) != len(data[0]) {
+			/*if len(data[j]) != len(data[0]) {
 				return nil, errors.New("corrupted data")
-			}
+			}*/
 			points[pointX[j]] = big.NewInt(0).SetBytes(data[j][SIZE*i : SIZE*(i+1)])
 		}
 		//recover part i of secret using lagrange polynomial
