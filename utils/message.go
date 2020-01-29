@@ -114,14 +114,6 @@ type Clove struct {
 	AssociatedData []byte // for 2-threshold data only; threshold is assumed to be 2 and index is % 2 + 1
 }
 
-type DumbClove struct {
-	Index          uint32
-	Threshold      uint32
-	SequenceNumber string
-	Data           string
-	AssociatedData []byte // for 2-threshold data only; threshold is assumed to be 2 and index is % 2 + 1
-}
-
 /*
 Wrap wraps a clove into a gossipPacket
 */

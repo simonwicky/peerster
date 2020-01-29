@@ -244,7 +244,7 @@ func getTuple(n uint, pathsTaken map[string]bool, peers []string) ([]string, map
 			}
 		}
 	}
-	return tuple[:i], pathsTaken, fmt.Errorf("Not enough available paths in", peers, "of", pathsTaken, "!")
+	return tuple[:i], pathsTaken, errors.New(fmt.Sprint("Not enough available paths in", peers, "of", pathsTaken, "!"))
 }
 
 /*

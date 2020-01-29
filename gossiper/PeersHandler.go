@@ -137,8 +137,8 @@ func (cc *ClovesCollector) Add(clove *utils.Clove, predecessor string) bool {
 			Data:           make([]byte, len(clove.Data)),
 			SequenceNumber: make([]byte, len(clove.SequenceNumber)),
 		}
-		copy(cc.cloves[sequenceNumber][predecessor][idx].SequenceNumber, clove.SequenceNumber)
-		copy(cc.cloves[sequenceNumber][predecessor][idx].Data, clove.Data)
+		copy(cc.cloves[sequenceNumber][predecessor][idx].SequenceNumber[:], clove.SequenceNumber[:])
+		copy(cc.cloves[sequenceNumber][predecessor][idx].Data[:], clove.Data[:])
 		return true
 	}
 	//check if the threshold is met for that sequence numnber
@@ -211,12 +211,18 @@ func getKIndependentCloves(k uint32, seq map[string]map[uint32]*utils.Clove, pat
 		return true, resa, resb
 	}
 	//fmt.Println(res, k, indices)
-	for i, index := range indices {
+	for _, index := range indices {
 		for _, predecessor := range inv[index] {
 			if pathIsAvailable[predecessor] {
 				pathIsAvailable[predecessor] = false
 				//check if seen[string(seq[predecessor][index].Data)]
-				if ok, cloves, paths := getKIndependentCloves(k-1, seq, pathIsAvailable, removeAtI(i, indices), inv, append(resa, seq[predecessor][index]), append(resb, predecessor)); ok {
+				newIndices := make([]uint32, 0)
+				for _, other := range indices {
+					if other != index {
+						newIndices = append(newIndices, other)
+					}
+				}
+				if ok, cloves, paths := getKIndependentCloves(k-1, seq, pathIsAvailable, newIndices, inv, append(resa, seq[predecessor][index]), append(resb, predecessor)); ok {
 					return true, cloves, paths
 				}
 			}
@@ -289,9 +295,9 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 		} else {
 			data := []string{}
 			for _, clove := range cloves {
-				data = append(data, fmt.Sprintf("%d::%s", clove.Index, string(clove.Data)))
+				data = append(data, fmt.Sprintf("%d::%s ", clove.Index, string(clove.Data)))
 			}
-			logger.Fatal(err.Error(), data)
+			logger.Fatal(err.Error(), data, cc.cloves[sequenceNumber])
 			forwarding = true
 		}
 	} else {
