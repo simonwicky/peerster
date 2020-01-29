@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"reflect"
 	"runtime"
 	"time"
 
@@ -95,6 +96,19 @@ func NewClovesCollector(g *Gossiper) *ClovesCollector {
 	return cc
 }
 
+func CloneValue(source interface{}, destin interface{}) {
+	x := reflect.ValueOf(source)
+	if x.Kind() == reflect.Ptr {
+		starX := x.Elem()
+		y := reflect.New(starX.Type())
+		starY := y.Elem()
+		starY.Set(starX)
+		reflect.ValueOf(destin).Elem().Set(y.Elem())
+	} else {
+		destin = x.Interface()
+	}
+}
+
 func (cc *ClovesCollector) Add(clove *utils.Clove, predecessor string) bool {
 	var sequenceNumber string = string(clove.SequenceNumber)
 	//make sure there is storage for that sequence number
@@ -108,14 +122,14 @@ func (cc *ClovesCollector) Add(clove *utils.Clove, predecessor string) bool {
 	//store the clove; make sure to deep copy clove data
 	idx := clove.Index
 	if _, ok := cc.cloves[sequenceNumber][predecessor][idx]; !ok {
-
 		cc.cloves[sequenceNumber][predecessor][idx] = &utils.Clove{
 			Index:          clove.Index,
-			SequenceNumber: clove.SequenceNumber,
 			Threshold:      clove.Threshold,
-			Data:           []byte(string(clove.Data)),
+			Data:           make([]byte, len(clove.Data)),
+			SequenceNumber: make([]byte, len(clove.SequenceNumber)),
 		}
-		//copy(cc.cloves[sequenceNumber][predecessor][idx].Data, clove.Data)
+		copy(cc.cloves[sequenceNumber][predecessor][idx].SequenceNumber, clove.SequenceNumber)
+		copy(cc.cloves[sequenceNumber][predecessor][idx].Data, clove.Data)
 		return true
 	}
 	//check if the threshold is met for that sequence numnber
@@ -200,13 +214,11 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 	logger := utils.LogObj.Named("rec")
 
 	//store clove by sequence number
-	if cc.Add(clove, predecessor) {
-		logger.Debug("added clove: ", string(clove.Data), " of ", sequenceNumber, " from ", predecessor)
-	}
+	cc.Add(clove, predecessor)
 	forwarding := false
 	p := 0.8
 	if met, cloves, paths := cc.MeetsThreshold(sequenceNumber, clove.Threshold); met {
-		logger.Debug("recovered clove from", paths)
+		//logger.Debug("recovered clove from", paths)
 		df, err := utils.NewDataFragment(cloves)
 		if err == nil {
 			switch {
@@ -217,7 +229,7 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 						if err == nil {
 							//accept to be a proxy
 							for i, path := range paths {
-								logger.Debug("sent accept clove to ", path)
+								//logger.Debug("sent accept clove to ", path)
 								g.sendToPeer(path, output[i].Wrap())
 							}
 						}

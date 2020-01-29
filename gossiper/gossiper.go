@@ -330,7 +330,7 @@ func (g *Gossiper) initiate(pathsTaken map[string]bool) map[string]bool {
 			utils.LogObj.Fatal(err.Error())
 		}
 	} else {
-		utils.LogObj.Warn(err.Error())
+		//utils.LogObj.Warn(err.Error())
 	}
 	return pathsStillAvailable
 }

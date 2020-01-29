@@ -19,7 +19,7 @@ func (g *Gossiper) HttpServerHandler(port string) {
 	r.HandleFunc("/proxies", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		utils.LogObj.Warn("proxies ", g.proxyPool)
+		//utils.LogObj.Warn("proxies ", g.proxyPool)
 		paths := [][]string{}
 		/*mockProxies := []*Proxy{&Proxy{
 			Paths: [2]string{"127.0.0.1:5001", "127.0.0.1:5001"},

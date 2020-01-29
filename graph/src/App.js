@@ -233,14 +233,15 @@ class App extends React.Component {
       //edges.push([nodes[next], nodes[n - i-1]])
       add(nodes[next], nodes[n - i-1])
     }
-    for(var i = 0; i < k; ++i) {
+    //connect the ndes to the start nodes
+    for(var i = 0; i <= k; ++i) {
       //edges.push(['Alice', nodes[i]])
       add(nodeA, nodes[i])
       //edges.push(['Bob', nodes[n-i-1]])
       add(nodeB, nodes[n-i-1])
     }
     //random walks
-    this.setState({nodes: nodes.filter(node => used.has(node)), edges: edges})
+    this.setState({nodes: this.state.nodes.concat(nodes.filter(node => used.has(node))), edges: edges})
   }
   do = () => {
     switch (this.state.action) {
