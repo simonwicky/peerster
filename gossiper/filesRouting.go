@@ -3,6 +3,7 @@ package gossiper
 import (
 	"sync"
 	"github.com/simonwicky/Peerster/utils"
+	"encoding/hex"
 	"sort"
 	"strings"
 	"fmt"
@@ -49,22 +50,28 @@ func (filesRouting *FilesRouting) RoutesSorted(keywords []string) []FileRoutes {
 	filesRoutes := filesRouting.GetAllRoutes()
 	filescpy := make([]FileRoutes, len(filesRoutes))
 	copy(filescpy, filesRoutes)
+	fmt.Println("Before sort")
+	filesRouting.dump()
 	sort.Slice(filescpy, func(i, j int) bool {
 		return len(longestMatch(filescpy[i], keywords)) > len(longestMatch(filescpy[j], keywords))
 	})
+	filesRouting.dump()
 	return filescpy
 }
 
 //Updates the routing table according to the search reply
-func (filesRouting *FilesRouting) UpdateRouting(reply *utils.GCSearchReply){
-	fmt.Println("Update files routing table")
+func (filesRouting *FilesRouting) UpdateRouting(reply utils.GCSearchReply){
+	fmt.Println("print before Update files routing table")
+	utils.LogGCSearchReply(&reply)
 
 	for _, result := range reply.AccessibleFiles {
 		//if len(result.ChunkMap) == int(result.ChunkCount){
+			fmt.Println( hex.EncodeToString(result.MetafileHash))
 			fileInfo := utils.FileInfo {
 				Name: result.FileName, 
 				MetafileHash: result.MetafileHash,
 			}
+			copy(fileInfo.MetafileHash, result.MetafileHash)
 			filesRouting.addRoute(fileInfo, reply.Origin)
 		//}
 	}
@@ -92,7 +99,9 @@ func lcms(fRoute FileRoutes ,keywords []string) string {
 func (filesRouting *FilesRouting) addRoute(fileInfo utils.FileInfo, route string){
 	filesRouting.Lock()
 	defer filesRouting.Unlock()
-	if fileRoutes, found := filesRouting.filesRoutes[utils.HexToString(fileInfo.MetafileHash)]; found {
+	fmt.Println( hex.EncodeToString(fileInfo.MetafileHash))
+
+	if fileRoutes, found := filesRouting.filesRoutes[ hex.EncodeToString(fileInfo.MetafileHash)]; found {
 		for _, r := range fileRoutes.Routes {
 			if r == route {
 				return 
@@ -100,7 +109,9 @@ func (filesRouting *FilesRouting) addRoute(fileInfo utils.FileInfo, route string
 		}
 		fileRoutes.Routes = append(fileRoutes.Routes, route)
 	}else {
-		filesRouting.filesRoutes[utils.HexToString(fileInfo.MetafileHash)] = createFileRoute(fileInfo, []string{route})
+		fmt.Println("wrong",  hex.EncodeToString(fileInfo.MetafileHash))
+
+		filesRouting.filesRoutes[ hex.EncodeToString(fileInfo.MetafileHash)] = createFileRoute(fileInfo, []string{route})
 	}
 	//fmt.Printf("Added entry %v with route %s", fileInfo, route )
 
@@ -117,6 +128,8 @@ func (filesRouting *FilesRouting) GetAllRoutes() (routes []FileRoutes){
 
 
 func (filesRouting *FilesRouting) asSearchResults() []*utils.SearchResult{
+	filesRouting.Lock()
+	defer filesRouting.Unlock()
 	var results []*utils.SearchResult
 	for _,fileRoute := range filesRouting.filesRoutes{
 		result := &utils.SearchResult{
@@ -124,6 +137,8 @@ func (filesRouting *FilesRouting) asSearchResults() []*utils.SearchResult{
 			MetafileHash: fileRoute.FileInfo.MetafileHash,
 			ChunkCount: uint64(fileRoute.FileInfo.Size / int64(2 << 12)),
 		}
+		fmt.Println( "comparison", hex.EncodeToString(result.MetafileHash), hex.EncodeToString(fileRoute.FileInfo.MetafileHash))
+
 		results = append(results,result)
 	}
 	return results
@@ -134,9 +149,9 @@ func (filesRouting *FilesRouting) dump(){
 	defer filesRouting.Unlock()
 	fmt.Println("Dump files routing table:")
 	i := 0
-	for _,v := range filesRouting.filesRoutes {
+	for k,v := range filesRouting.filesRoutes {
 		i += 1
-		fmt.Printf("%d) %s %v\n",i, v.FileInfo.Name, v.Routes)
+		fmt.Printf("%d) %s %v %s %s\n",i, v.FileInfo.Name, v.Routes,  k, hex.EncodeToString(v.FileInfo.MetafileHash))
 	}
 	return
 }

@@ -237,6 +237,8 @@ func (fs *FileStorage) asSearchResults()[]*utils.SearchResult{
 			MetafileHash: fd.metafileHash,
 			ChunkCount: uint64(fd.size / int64(2 << 12)),
 		}
+		fmt.Println("build ",  hex.EncodeToString(result.MetafileHash))
+
 		results = append(results,result)
 	}
 	return results

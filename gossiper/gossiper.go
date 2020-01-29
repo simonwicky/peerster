@@ -91,6 +91,7 @@ type Gossiper struct {
 	//Freenet routing mapping filenames to neighbors
 	FilesRouting *FilesRouting
 	GCFileSearcher *GCFileSearcher
+	GCSearchHopLimit uint32
 }
 
 

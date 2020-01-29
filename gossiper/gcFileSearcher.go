@@ -60,6 +60,7 @@ func (s *GCFileSearcher) search(keyword []string){
 			ID: binary.LittleEndian.Uint32(randBytes),
 			Origin : s.g.Name,
 			Keywords : s.keywords,
+			HopLimit:s.g.GCSearchHopLimit,
 	}
 	fmt.Println("New GC search ID ", searchRequest.ID)
 	if !s.running {
@@ -77,9 +78,7 @@ func contains(haystack []*utils.SearchResult, needle *utils.SearchResult) bool{
 }
 
 func (s *GCFileSearcher) receiveReply(reply *utils.GCSearchReply){
-	if reply.Failure { 
-		return
-	}
+
 	s.repliesMux.Lock()
 	if channel, ok := s.repliesDispatcher[reply.ID]; ok{
 		channel<-reply
@@ -113,12 +112,15 @@ func (s *GCFileSearcher) manageRequest(searchRequest *utils.GCSearchRequest){
 
 				select{
 					case reply := <- replyChannel:
-						utils.LogGCSearchReply(reply)
+							
+						if !reply.Failure { 
+							utils.LogGCSearchReply(reply)
 
-						s.g.FilesRouting.UpdateRouting(reply)
-						for _, newResult := range reply.Results {
-							if !contains(receivedResults, newResult){
-								receivedResults = append(receivedResults, newResult)
+							s.g.FilesRouting.UpdateRouting(*reply)
+							for _, newResult := range reply.Results {
+								if !contains(receivedResults, newResult){
+									receivedResults = append(receivedResults, newResult)
+								}
 							}
 						}
 					case <- ticker.C:
@@ -148,18 +150,22 @@ func (s *GCFileSearcher) manageRequest(searchRequest *utils.GCSearchRequest){
 			
 			
 		}
+		fmt.Println("resting peers", restingPeers)
 		for _, peer := range restingPeers {
 			
 			if len(receivedResults) < int(s.matchThreshold){
 				if s.SendRequest(*searchRequest, peer){
 					select{
 						case reply := <- replyChannel:
-							utils.LogGCSearchReply(reply)
+							
+							if ! reply.Failure{
+								utils.LogGCSearchReply(reply)
 
-							s.g.FilesRouting.UpdateRouting(reply)
-							for _, newResult := range reply.Results {
-								if !contains(receivedResults, newResult){
-									receivedResults = append(receivedResults, newResult)
+								s.g.FilesRouting.UpdateRouting(*reply)
+								for _, newResult := range reply.Results {
+									if !contains(receivedResults, newResult){
+										receivedResults = append(receivedResults, newResult)
+									}
 								}
 							}
 						case <- ticker.C:
@@ -188,6 +194,7 @@ func (s *GCFileSearcher) SendRequest(searchRequest utils.GCSearchRequest, peer s
 	}
 
 	fmt.Fprintf(os.Stderr,"Sending Garlic Cast search to %s\n", peer)
+	s.g.FilesRouting.dump()
 
 	s.g.sendToPeer(peer, pkt)
 	return true
