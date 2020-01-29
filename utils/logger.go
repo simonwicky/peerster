@@ -111,9 +111,9 @@ func LogConsensus(id uint32,msg *TLCMessage,nameList []string){
 }
 
 func LogGCSearchReply(reply *GCSearchReply){
-	fmt.Printf("Log Garlic Cast Search Reply from %s with ID %d\n.Accessible files", reply.Origin, reply.ID)
-	for _, file := range reply.AccessibleFiles {
-		fmt.Printf("%s ", file.FileName)
+	fmt.Printf("Log Garlic Cast Search Reply from %s with ID %dAccessible files:\n", reply.Origin, reply.ID)
+	for i, file := range reply.AccessibleFiles {
+		fmt.Printf("%d) %s %s\n", i + 1, file.FileName, hex.EncodeToString(file.MetafileHash))
 	}
 	fmt.Printf("\n")
 }
