@@ -1,10 +1,12 @@
 package gossiper
 
-import ("fmt"
-		"github.com/dedis/protobuf"
-		"github.com/simonwicky/Peerster/utils"
-		"os"
-		"strings"
+import (
+	"fmt"
+	"os"
+	"strings"
+
+	"github.com/simonwicky/Peerster/utils"
+	"go.dedis.ch/protobuf"
 )
 
 //================================================================
@@ -53,6 +55,8 @@ func (g *Gossiper) ClientHandle(simple bool){
 			}
 
 		}
+
+	}
 }
 
 func (g *Gossiper) clientSimpleMessageHandler(message *utils.Message) {
@@ -69,17 +73,17 @@ func (g *Gossiper) clientSimpleMessageHandler(message *utils.Message) {
 func (g *Gossiper) clientRumorHandler(message *utils.Message) {
 	utils.LogClient(message.Text)
 	rumor := g.generateRumor(message.Text)
-	g.sendToRandomPeer(&utils.GossipPacket{Rumor : &rumor})
+	g.sendToRandomPeer(&utils.GossipPacket{Rumor: &rumor})
 
 }
 
-func (g *Gossiper) clientPrivateMessageHandler(message *utils.Message){
+func (g *Gossiper) clientPrivateMessageHandler(message *utils.Message) {
 	pm := utils.PrivateMessage{
-		Origin: g.Name,
-		ID: 0,
-		Text : message.Text,
+		Origin:      g.Name,
+		ID:          0,
+		Text:        message.Text,
 		Destination: *message.Destination,
-		HopLimit: g.hopLimit,
+		HopLimit:    g.hopLimit,
 	}
 
 	packet := &utils.GossipPacket{Private: &pm}
@@ -88,11 +92,11 @@ func (g *Gossiper) clientPrivateMessageHandler(message *utils.Message){
 }
 
 func (g *Gossiper) clientFileRequestHandler(message *utils.Message) {
-	dr := utils.DataRequest {
-		Origin: g.Name,
+	dr := utils.DataRequest{
+		Origin:      g.Name,
 		Destination: *message.Destination,
-		HopLimit: g.hopLimit,
-		HashValue : *message.Request,
+		HopLimit:    g.hopLimit,
+		HashValue:   *message.Request,
 	}
 	g.NewDatadownloader(&dr, *message.File)
 }
@@ -101,13 +105,13 @@ func (g *Gossiper) clientFileIndexHandler(message *utils.Message) {
 	g.fileStorage.addFromSystem(g, *message.File)
 }
 
-func(g *Gossiper) clientFileSearchHandler(message *utils.Message) {
+func (g *Gossiper) clientFileSearchHandler(message *utils.Message) {
 	searcher := g.getFileSearcher()
 	if !searcher.running {
-		keywords := strings.Split(*message.Keywords,",")
-		go searcher.Start(*message.Budget,keywords)
+		keywords := strings.Split(*message.Keywords, ",")
+		go searcher.Start(*message.Budget, keywords)
 	} else {
-		fmt.Fprintln(os.Stderr,"File search already running")
+		fmt.Fprintln(os.Stderr, "File search already running")
 	}
 }
 
