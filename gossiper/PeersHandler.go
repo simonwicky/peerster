@@ -7,7 +7,6 @@ import (
 	"os"
 	"runtime"
 	"time"
-
 	"github.com/simonwicky/Peerster/utils"
 	"go.dedis.ch/protobuf"
 )
@@ -255,7 +254,11 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 				}
 			case df.Content != nil:
 				//index file
+			case df.Query != nil :
+				searcher := g.getGCFileSearcher()
+				go searcher.startSearch(df.Query.Keywords)
 			}
+			
 			
 		} else {
 			data := []string{}
@@ -430,6 +433,7 @@ func (g *Gossiper) peerTLCAckHandler(packet *utils.GossipPacket) {
 }
 
 func (g *Gossiper) peerGCSearchRequestHandler(packet *utils.GossipPacket){
+	//fmt.Println("bitch")
 	request := packet.GCSearchRequest
 	searcher := g.getGCFileSearcher()
 	searcher.repliesMux.Lock()
@@ -441,7 +445,7 @@ func (g *Gossiper) peerGCSearchRequestHandler(packet *utils.GossipPacket){
 			ID: request.ID,
 			Origin: g.Name, 
 			Failure:true,
-			HopLimit:10,
+			HopLimit:g.GCSearchHopLimit,
 		}
 		g.sendPointToPoint(&utils.GossipPacket{GCSearchReply:reply}, packet.GCSearchRequest.Origin)
 
@@ -456,7 +460,8 @@ func (g *Gossiper) peerGCSearchRequestHandler(packet *utils.GossipPacket){
 			foundFiles = append(foundFiles, g.fileStorage.lookupFile(kw)...)
 			//Assuming there is consensus over the file names 
 			if ips :=packet.GCSearchRequest.ProxiesIP; ips != nil && len(keywords) == 1 && foundFiles[0].name == keywords[0] {
-				g.deliverContent(*ips)
+				fmt.Println("Deliver file ", kw)
+				g.deliver(kw, *ips)
 			}
 		}
 		if len(foundFiles) < int(searcher.matchThreshold) {
@@ -469,8 +474,9 @@ func (g *Gossiper) peerGCSearchRequestHandler(packet *utils.GossipPacket){
 			Origin: g.Name,
 			AccessibleFiles:accessibleFiles,
 			Failure: false,
-			HopLimit:10,
+			HopLimit:g.GCSearchHopLimit,
 		}
+		utils.LogGCSearchReply(reply)
 		g.sendPointToPoint(&utils.GossipPacket{GCSearchReply:reply}, packet.GCSearchRequest.Origin)
 	}
 }

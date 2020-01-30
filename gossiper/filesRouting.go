@@ -18,6 +18,7 @@ type FilesRouting struct {
 type FileRoutes struct {
 	FileInfo utils.FileInfo
 	Routes []string
+	ClovesPath []string
 }
 
 func createFileRoute(fileInfo utils.FileInfo, routes []string) *FileRoutes {
@@ -78,13 +79,13 @@ func (filesRouting *FilesRouting) UpdateRouting(reply utils.GCSearchReply){
 	Returns the longest match 
 */
 func longestMatch(fRoute FileRoutes ,keywords []string) string {
-	prefix := "" 
+	longestkw := "" 
 	for _, kw := range keywords {
-		if strings.HasPrefix(fRoute.FileInfo.Name, kw){
-			prefix = kw
+		if strings.Contains(fRoute.FileInfo.Name, kw) && len(kw) > len(longestkw){
+			longestkw = kw
 		}
 	}
-	return prefix
+	return longestkw
 }
 
 /*
@@ -116,7 +117,7 @@ func (filesRouting *FilesRouting) GetAllRoutes() (routes []FileRoutes){
 	defer filesRouting.Unlock()
 	for _,v := range filesRouting.filesRoutes {
 		routes = append(routes, *v)
-	}
+	}	
 	return
 }
 

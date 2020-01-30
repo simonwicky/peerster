@@ -54,6 +54,7 @@ func (fs *FileStorage) addFromSystem(g* Gossiper, name string){
 	var fileMetaData FileData
 	fileMetaData.name = name
 	fileMetaData.size = stat.Size()
+	logger := utils.LogObj.Named("file")
 
 	var metafileBytes []byte
 
@@ -79,8 +80,8 @@ func (fs *FileStorage) addFromSystem(g* Gossiper, name string){
 	fileMetaData.local = true
 	fs.lock.Lock()
 	fs.data[fileMetaData.sha] = &fileMetaData
-	fmt.Fprintln(os.Stderr,"Indexed file: " + fs.data[fileMetaData.sha].name)
-	fmt.Fprintln(os.Stderr,"Id file: " + string(fileMetaData.sha))
+	fmt.Println("Indexed file: " + fs.data[fileMetaData.sha].name)
+	logger.Debug("Id file: " + string(fileMetaData.sha))
 	fs.lock.Unlock()
 
 	//TLCMessage

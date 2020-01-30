@@ -219,8 +219,9 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 			SessionKeySize: 32,
 			Buffering:      10,
 			Redundancy:     3,
-			DiscoveryRate:  4,
+			DiscoveryRate:  5,
 		},
+		GCSearchHopLimit:uint32(3), 
 		newProxies: make(chan *Proxy),
 		proxyPool:  &ProxyPool{proxies: make([]*Proxy, 0)},
 		//secretSharer : NewSecretSharer(),
@@ -256,7 +257,7 @@ func getTuple(n uint, pathsTaken map[string]bool, peers []string) ([]string, map
 			}
 		}
 	}
-	return tuple[:i], pathsTaken, fmt.Errorf("Not enough available paths in", peers, "of", pathsTaken, "!")
+	return tuple[:i], pathsTaken, fmt.Errorf("Not enough available paths in %s of %v !", peers, pathsTaken)
 }
 
 /*
@@ -388,8 +389,9 @@ func (g *Gossiper) Start(simple bool, port string) {
 	}
 	go g.rumorRoute()
 	go g.HttpServerHandler(port)
-	//go g.initiator(3, g.knownPeers, nil)
+    //go g.initiator(3, g.knownPeers, nil)
 	//go g.proxySrv()
+
 	g.PeersHandle(simple)
 }
 

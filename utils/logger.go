@@ -23,6 +23,7 @@ func LogSimpleMessage(packet *SimpleMessage){
 }
 
 func LogPeers(peers []string){
+	
 	//fmt.Printf("PEERS %s\n", strings.Join(peers,","))
 }
 
@@ -124,7 +125,7 @@ func LogGCSearchReply(reply *GCSearchReply){
 Log prints messages to the std output prepended by a [DEBUG] flag
 */
 func Log(msg ...interface{}) {
-	//fmt.Println("[\033[0;36mDEBUG\033[0m]", fmt.Sprint(msg...))
+	fmt.Println("[\033[0;36mDEBUG\033[0m]", fmt.Sprint(msg...))
 }
 
 /*

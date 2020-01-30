@@ -8,7 +8,6 @@ import (
 	"encoding/binary"
 	"github.com/simonwicky/Peerster/utils"
 	"fmt"
-	"os"
 	"time"
 	"sync"
 
@@ -184,16 +183,18 @@ func (s *GCFileSearcher) manageRequest(searchRequest *utils.GCSearchRequest){
 func (s *GCFileSearcher) SendRequest(searchRequest utils.GCSearchRequest, peer string) bool{
 	fmt.Println(peer, searchRequest.Origin)
 
-	if peer == searchRequest.Origin{
+	if searchRequest.HopLimit <= 0 || peer == searchRequest.Origin{
 		return false
 	}
+	
 	searchRequest.Origin = s.g.Name
+	searchRequest.HopLimit -= 1
 	//Update the origin so peers only know the direct upstream and downstream nodes in the chain
 	pkt := &utils.GossipPacket {
 		GCSearchRequest: &searchRequest,
 	}
 
-	fmt.Fprintf(os.Stderr,"Sending Garlic Cast search to %s\n", peer)
+	fmt.Printf("Sending Garlic Cast search to %s\n", peer)
 	s.g.sendToPeer(peer, pkt)
 	return true
 }
