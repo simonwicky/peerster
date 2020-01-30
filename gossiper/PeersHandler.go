@@ -7,6 +7,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"sync"
 	"time"
 	"github.com/simonwicky/Peerster/utils"
 	"go.dedis.ch/protobuf"
@@ -88,6 +89,7 @@ of fast lookup insertion deletion, and to be able to store multiple cloves from 
 but not store many of the same exact cloves from the same exact predecessor
 */
 type ClovesCollector struct {
+	sync.Mutex
 	handler      chan IncomingClove
 	directs      chan *utils.Clove
 	cloves       map[string]map[string]map[uint32]*utils.Clove
@@ -122,6 +124,9 @@ func CloneValue(source interface{}, destin interface{}) {
 Add is a thread unsafe method to add a clove to the collector(it is meant to be used in a isolated context)
 */
 func (cc *ClovesCollector) Add(clove *utils.Clove, predecessor string) bool {
+	str := string(clove.Data)
+	cc.Lock()
+	defer cc.Unlock()
 	var sequenceNumber string = string(clove.SequenceNumber)
 	//make sure there is storage for that sequence number
 	if _, ok := cc.cloves[sequenceNumber]; !ok {
@@ -139,9 +144,13 @@ func (cc *ClovesCollector) Add(clove *utils.Clove, predecessor string) bool {
 			Threshold:      clove.Threshold,
 			Data:           make([]byte, len(clove.Data)),
 			SequenceNumber: make([]byte, len(clove.SequenceNumber)),
+			Canary:         clove.Canary,
 		}
 		copy(cc.cloves[sequenceNumber][predecessor][idx].SequenceNumber[:], clove.SequenceNumber[:])
 		copy(cc.cloves[sequenceNumber][predecessor][idx].Data[:], clove.Data[:])
+		if str != string(cc.cloves[sequenceNumber][predecessor][idx].Data) {
+			utils.LogObj.Fatal("storing error encountered!")
+		}
 		return true
 	}
 	//check if the threshold is met for that sequence numnber
@@ -252,6 +261,7 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 			case df.Proxy != nil:
 				if df.Proxy.Forward {
 					if df.Proxy.SessionKey == nil {
+						logger.Debug("ProxyInit")
 						output, err := utils.NewProxyAccept(g.directProxyPort).Split(2, 2)
 						if err == nil {
 							//accept to be a proxy
@@ -262,18 +272,21 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 							}
 						}
 					} else {
+						logger.Debug("ProxyAck")
 						// register session key and id
 						logger.Debug("registering session key")
 					}
 				} else {
+					logger.Debug("ProxyAccept")
 					var fixPaths [2]string
 					copy(fixPaths[:], paths[:2])
 					// record proxy and send session key
-					if df.Proxy.IP != nil && df.Proxy.SessionKey != nil {
-						g.newProxies <- &Proxy{Paths: fixPaths, IP: *df.Proxy.IP, SessionKey: *df.Proxy.SessionKey}
+					if df.Proxy.IP != nil {
+						g.newProxies <- &Proxy{Paths: fixPaths, IP: *df.Proxy.IP}
 					}
 				}
 			case df.Delivery != nil: // this is read by a provider proxy
+				logger.Debug("delivery")
 				//directly connect by TCP to proxy provided
 				atTcp, err := net.ResolveTCPAddr("tcp", df.Delivery.IP)
 				if err != nil {
@@ -302,32 +315,36 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 			
 			
 		} else {
-			data := []string{}
-			for _, clove := range cloves {
-				data = append(data, fmt.Sprintf("%d::%s ", clove.Index, string(clove.Data)))
+			//this sequence number is corrupted, drop whole serie
+			logger.Fatal(g.Name, "> ", err.Error(), " ", cc.cloves[sequenceNumber])
+			for predecessor, cloves := range cc.cloves[sequenceNumber] {
+				for index, clove := range cloves {
+					logger.Fatal(g.Name, "> (", index, " = ", clove.Index, ") from:", predecessor, " ", clove.Data[:5], clove.Data[len(clove.Data)-5:], "=", clove.Canary, " => ", []byte(clove.Canary)[:5])
+				}
 			}
-			logger.Fatal(err.Error(), data, cc.cloves[sequenceNumber])
+			delete(cc.cloves, sequenceNumber)
 			forwarding = true
 		}
 	} else {
 		forwarding = true
 	}
 	if forwarding { // !full
-		if successor, ok := cc.routingTable[predecessor]; ok && successor != g.addressPeer.String() {
-			g.sendToPeer(successor, clove.Wrap())
-		} else {
-			//forward to one random neighbour
-			if rand.Float64() < p {
-				if successor := g.getRandomPeer(predecessor); successor != nil {
-					utils.LogObj.Named("fwd").Debug("forwarding clove to ", *successor)
-					cc.routingTable[predecessor] = *successor
-					cc.routingTable[*successor] = predecessor
-					g.sendToPeer(*successor, clove.Wrap())
-				} else {
-					logger.Warn("could not get no successor!")
-				}
+		//if successor, ok := cc.routingTable[predecessor]; ok && successor != g.addressPeer.String() {
+		//	logger.Debug(g.Name, " sending ", clove.SequenceNumber, " to ", successor, " from ", predecessor)
+		//	g.sendToPeer(successor, clove.Wrap())
+		//} else {
+		//forward to one random neighbour
+		if rand.Float64() < p {
+			if successor := g.getRandomPeer(predecessor); successor != nil {
+				logger.Debug(g.Name, " forwarding ", clove.SequenceNumber, " to ", successor, " from ", predecessor)
+				cc.routingTable[predecessor] = *successor
+				cc.routingTable[*successor] = predecessor
+				g.sendToPeer(*successor, clove.Wrap())
+			} else {
+				logger.Warn("could not get no successor!")
 			}
 		}
+		//}
 
 	}
 }

@@ -137,7 +137,7 @@ type Clove struct {
 	Threshold      uint32
 	SequenceNumber []byte
 	Data           []byte
-	AssociatedData []byte // for 2-threshold data only; threshold is assumed to be 2 and index is % 2 + 1
+	Canary         string // for 2-threshold data only; threshold is assumed to be 2 and index is % 2 + 1
 }
 
 /*
@@ -171,7 +171,8 @@ func NewDataFragment(cloves []*Clove) (*DataFragment, error) {
 	data := make([][]byte, threshold)
 	for i, clove := range cloves {
 		xs[i] = int(clove.Index)
-		data[i] = clove.Data
+		data[i] = []byte(clove.Canary)
+		LogObj.Warn(data[i])
 	}
 	marshalled, err := recoverSecret(data, xs)
 	if err != nil {
@@ -221,11 +222,14 @@ func (df *DataFragment) Split(k uint, n uint) ([]*Clove, error) {
 	cloves := make([]*Clove, len(secrets))
 	for i, secret := range secrets {
 		//generate uuid sequence number
-		cloves[i] = &Clove{Threshold: uint32(k), Index: uint32(i) + 1, Data: secret, SequenceNumber: sn}
+		cloves[i] = &Clove{Threshold: uint32(k), Index: uint32(i) + 1, Data: secret, SequenceNumber: sn, Canary: string(secret)}
 	}
 	return cloves, nil
 }
 
+/*
+ProxyRequest denotes
+*/
 type ProxyRequest struct {
 	Forward    bool
 	IP         *string
@@ -244,7 +248,7 @@ type Content struct {
 }
 
 /*
-Content describes file delivery
+Delivery describes file delivery
 */
 type Delivery struct {
 	IP     string    // the provider only sends one initiator proxy per provider proxy
