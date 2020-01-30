@@ -10,7 +10,7 @@ app.post('/', function (req, res) {
     const children = req.body.cmds.map(cmd => {
         const [prog, ...args] = cmd.split(' ')
         console.info(`spawning ${prog} ${args}`)
-        return spawn(prog, args.concat(['-filter', 'rec', 'init']))
+        return spawn(prog, args.concat(['-filter', 'rec,init']))
     })
     children.forEach(child => {
         child.stdout.on('data', chunk => console.log(chunk.toString()))

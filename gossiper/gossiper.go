@@ -24,6 +24,7 @@ type Settings struct {
 	Redundancy     uint          // number of cloves sent for any threshold
 	DiscoveryRate  time.Duration // period of proxy discovery
 	Connectivity   uint          // d used in the paper = number of proxies for search for example
+	ProxyMocking   bool
 }
 
 type Gossiper struct {
@@ -101,7 +102,6 @@ type Gossiper struct {
 	consensus  *Consensus
 
 	//cloves; can only receive one clove from particular predecessor for a particular sequence number
-	cloves          map[string]map[string]*utils.Clove
 	newProxies      chan *Proxy
 	settings        *Settings
 	proxyPool       *ProxyPool
@@ -208,8 +208,9 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 			Buffering:      10,
 			Redundancy:     3,
 			DiscoveryRate:  4,
+			ProxyMocking:   true,
 		},
-		newProxies: make(chan *Proxy),
+		newProxies: make(chan *Proxy, 100),
 		proxyPool:  &ProxyPool{proxies: make([]*Proxy, 0)},
 		//secretSharer : NewSecretSharer(),
 	}
@@ -310,14 +311,14 @@ and sends a clove to each path
 */
 func (g *Gossiper) initiate(pathsTaken map[string]bool) map[string]bool {
 	knownPeers := g.knownPeers
-	series := utils.LogObj.Named("series")
+	//series := utils.LogObj.Named("init")
 	tuple, pathsStillAvailable, err := getTuple(g.settings.Redundancy, pathsTaken, knownPeers)
 	if err == nil {
 		cloves, err := utils.NewProxyInit().Split(2, g.settings.Redundancy)
 		//test
 		if err == nil {
 			for i, clove := range cloves {
-				series.Debug(string(clove.SequenceNumber), "(", i, ") = ", string(clove.Data))
+				//series.Debug(string(clove.SequenceNumber), "(", i, ") = ", string(clove.Data))
 				g.sendToPeer(tuple[i], clove.Wrap())
 			}
 		} else {

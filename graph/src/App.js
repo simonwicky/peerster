@@ -20,6 +20,7 @@ import Nav from 'react-bootstrap/Nav'
 import NavDropdown from 'react-bootstrap/NavDropdown'
 import FormControl from 'react-bootstrap/FormControl'
 import Toast from 'react-bootstrap/Toast'
+import Card from 'react-bootstrap/Card'
 import { Network, Node, Edge } from 'react-vis-network'
 import Double from './components/Double'
 import Create from './components/Create'
@@ -65,7 +66,20 @@ class ProxyToasts extends React.Component {
   }
   repr = node => {
     if(this.state.proxies.has(node)) {
-    return <Toast.Body>{this.state.proxies.get(node).proxies.map(proxy => proxy.map(path => <Button>{path}</Button>))}</Toast.Body>
+    return <Toast.Body>{this.state.proxies.get(node).proxies.map((proxy, i) => (
+      <Card>
+      <Card.Header>Proxy {i+1}</Card.Header>
+      <Card.Body>
+        <Card.Title>{proxy['IP']}</Card.Title>
+        <Card.Text>
+          <small>path_1</small> {proxy['_1']}
+        </Card.Text>
+        <Card.Text>
+          <small>path_2</small> {proxy['_2']}
+        </Card.Text>
+      </Card.Body>
+    </Card>
+      ))}</Toast.Body>
     } else {
       return <Toast.Body>No proxies</Toast.Body>
     }
@@ -89,7 +103,7 @@ class ProxyToasts extends React.Component {
             <Toast onClose={e => this.props.untest(node)} style={{width: 300}} >
               <Toast.Header>
                 <strong className="mr-auto">{node}</strong>
-                <small>just now</small>
+                <small>Proxies</small>
               </Toast.Header>
               {this.repr(node)}
             </Toast>

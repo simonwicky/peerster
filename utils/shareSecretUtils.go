@@ -5,7 +5,6 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"errors"
-	"fmt"
 	"math/big"
 )
 
@@ -93,7 +92,6 @@ func CombineAndDecrypt(cipherDataKey []*big.Int) ([]byte, error) {
 	cbc := cipher.NewCBCDecrypter(c, []byte(AES_IV))
 	data := make([]byte, len(cipherText))
 	cbc.CryptBlocks(data, cipherText)
-	fmt.Println(data)
 	//remove padding
 	pad_size := int(data[0])
 	if pad_size > SIZE {

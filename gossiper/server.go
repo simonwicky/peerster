@@ -21,17 +21,34 @@ func (g *Gossiper) HttpServerHandler(port string) {
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		//utils.LogObj.Warn("proxies ", g.proxyPool)
 		paths := [][]string{}
-		/*mockProxies := []*Proxy{&Proxy{
-			Paths: [2]string{"127.0.0.1:5001", "127.0.0.1:5001"},
-		}, &Proxy{
-			Paths: [2]string{"127.0.0.1:5003", "127.0.0.1:5004"},
-		}}*/
-		for _, proxy := range g.proxyPool.proxies {
-			//for _, proxy := range mockProxies {
-			paths = append(paths, proxy.Paths[:])
+		var proxiesJson []map[string]string = make([]map[string]string, 0)
+		var proxies []*Proxy
+		if g.settings.ProxyMocking {
+			if g.Name == "Alice" {
+				mockProxies := []*Proxy{&Proxy{
+					IP:    "127.0.0.1:5008",
+					Paths: [2]string{"127.0.0.1:5001", "127.0.0.1:5001"},
+				}, &Proxy{
+					IP:    "127.0.0.1:5009",
+					Paths: [2]string{"127.0.0.1:5003", "127.0.0.1:5004"},
+				}}
+				proxies = mockProxies
+			} else {
+				proxies = []*Proxy{}
+			}
+		} else {
+			proxies = g.proxyPool.proxies
 		}
-		data, err := json.Marshal(map[string][][]string{
-			"proxies": paths,
+		for _, proxy := range proxies {
+			paths = append(paths, proxy.Paths[:])
+			proxiesJson = append(proxiesJson, map[string]string{
+				"IP": proxy.IP,
+				"_1": proxy.Paths[0],
+				"_2": proxy.Paths[1],
+			})
+		}
+		data, err := json.Marshal(map[string][]map[string]string{
+			"proxies": proxiesJson,
 		})
 		if err != nil {
 			utils.LogObj.Fatal(err.Error())
