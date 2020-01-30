@@ -43,15 +43,32 @@ class ProxyToasts extends React.Component {
     const updatables = this.props.nodes.filter(node => !prev.has(node))
     if(this.props.map) {
       updatables.forEach(updatable => {
-        if (this.props.map.has(updatable)) {
-          console.log(`http://localhost:${this.props.map.get(updatable).httpPort}/proxies`)
-          fetch(`http://localhost:${this.props.map.get(updatable).httpPort}/proxies`)
-          .then(res => res.json())
-          .then(proxies => console.log(proxies)).catch(err => 'couldnt fetch proxies')
-        }
+        this.update(updatable)
+        setTimeout(this.update(updatable), 3000)
       })
     }
     
+  }
+  update = updatable => () => {
+    if (this.props.map.has(updatable)) {
+      console.log(`http://localhost:${this.props.map.get(updatable).httpPort}/proxies`)
+      fetch(`http://localhost:3000/proxies/${this.props.map.get(updatable).httpPort}`, {headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'Access-Control-Allow-Origin': '*' },})
+      .then(res => res.json())
+      .then(proxies => {
+        const nodesProxies = this.state.proxies
+        nodesProxies.set(updatable, proxies)
+        console.log(nodesProxies)
+        this.setState({proxies: nodesProxies})
+      }).catch(err => 'couldnt fetch proxies')
+    }
+    setTimeout(this.update(updatable), 3000)
+  }
+  repr = node => {
+    if(this.state.proxies.has(node)) {
+    return <Toast.Body>{this.state.proxies.get(node).proxies.map(proxy => proxy.map(path => <Button>{path}</Button>))}</Toast.Body>
+    } else {
+      return <Toast.Body>No proxies</Toast.Body>
+    }
   }
   render = () => (
       <div
@@ -74,7 +91,7 @@ class ProxyToasts extends React.Component {
                 <strong className="mr-auto">{node}</strong>
                 <small>just now</small>
               </Toast.Header>
-              <Toast.Body>See? Just like this.</Toast.Body>
+              {this.repr(node)}
             </Toast>
           ))}
         </div>
@@ -173,9 +190,9 @@ class App extends React.Component {
     })
   }
   connect = (nodeA, nodeB) => {
-    const k = 2
+    const k = 3
     const n = 5 * k
-    const nodes = this.state.nodes
+    const nodes = []
     const set = new Set() // set of edges (to avoid self-loops and double edges)
     const used = new Set() // set of nodes (to know which nodes are zombies)
     const edges = this.state.edges
@@ -184,9 +201,11 @@ class App extends React.Component {
       if(!set.has(repr(a, b)) && a != b) {
         edges.push([a, b])
         set.add(repr(a, b))
+        used.add(a)
+        used.add(b)
+        return true
       } 
-      used.add(a)
-      used.add(b)
+        return false
     }
     for(var i = 0; i < n; ++i) {
       nodes.push(makeid(5))
@@ -198,27 +217,31 @@ class App extends React.Component {
       let j = i
       let next = Math.floor((Math.random() * (n-2*k-1)) + k + 1)
       //edges.push([nodes[j], nodes[next]])
-      add(nodes[j], nodes[next])
+      while(!add(nodes[j], nodes[next])) {
+        next = Math.floor((Math.random() * (n-2*k-1)) + k + 1)
+      }
       j = next
       while(Math.random() < 0.4) {
         while(next == j) {
           next = Math.floor((Math.random() * (n-2*k-1)) + k + 1)
         }
         //edges.push([nodes[j], nodes[next]])
-        add(nodes[j], nodes[next])
-        j = next
+        if (add(nodes[j], nodes[next])) {
+          j = next
+        }
       }
       //edges.push([nodes[next], nodes[n - i-1]])
       add(nodes[next], nodes[n - i-1])
     }
-    for(var i = 0; i < k; ++i) {
+    //connect the ndes to the start nodes
+    for(var i = 0; i <= k; ++i) {
       //edges.push(['Alice', nodes[i]])
       add(nodeA, nodes[i])
       //edges.push(['Bob', nodes[n-i-1]])
       add(nodeB, nodes[n-i-1])
     }
     //random walks
-    this.setState({nodes: nodes.filter(node => used.has(node)), edges: edges})
+    this.setState({nodes: this.state.nodes.concat(nodes.filter(node => used.has(node))), edges: edges})
   }
   do = () => {
     switch (this.state.action) {
@@ -292,7 +315,7 @@ class App extends React.Component {
             <Button variant="danger" onClick={this.run}>Run</Button>
           </Navbar.Collapse>
         </Navbar>
-        <Network style={{height: '600px'}}>
+        <Network style={{height: '800px'}}>
           {this.state.nodes.map(node => <Node label={node} decorator={() => <Decorator test={this.test(node)}/>} id={node} />)}
           {this.state.edges.map(([u, v], i) => {
             return <Edge id={i} from={u}  to={v} />

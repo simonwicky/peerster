@@ -185,8 +185,8 @@ func NewProxyInit() *DataFragment {
 	return &DataFragment{Proxy: &ProxyRequest{Forward: true}}
 }
 
-func NewProxyAccept() *DataFragment {
-	return &DataFragment{Proxy: &ProxyRequest{Forward: false}}
+func NewProxyAccept(ip string) *DataFragment {
+	return &DataFragment{Proxy: &ProxyRequest{Forward: false, IP: &ip}}
 }
 
 /*
@@ -212,7 +212,7 @@ func (df *DataFragment) Split(k uint, n uint) ([]*Clove, error) {
 	if err != nil {
 		return nil, err
 	}
-	sn := make([]byte, 8)
+	sn := make([]byte, 32)
 	rand.Read(sn)
 	cloves := make([]*Clove, len(secrets))
 	for i, secret := range secrets {
@@ -224,6 +224,7 @@ func (df *DataFragment) Split(k uint, n uint) ([]*Clove, error) {
 
 type ProxyRequest struct {
 	Forward    bool
+	IP         *string
 	SessionKey *[]byte
 }
 

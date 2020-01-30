@@ -17,15 +17,17 @@ func (g *Gossiper) HttpServerHandler(port string) {
 	// Simple static webserver:
 	r := mux.NewRouter()
 	r.HandleFunc("/proxies", func(w http.ResponseWriter, r *http.Request) {
-		utils.LogObj.Warn("proxies ", g.proxyPool)
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+		//utils.LogObj.Warn("proxies ", g.proxyPool)
 		paths := [][]string{}
-		mockProxies := []*Proxy{&Proxy{
+		/*mockProxies := []*Proxy{&Proxy{
 			Paths: [2]string{"127.0.0.1:5001", "127.0.0.1:5001"},
 		}, &Proxy{
 			Paths: [2]string{"127.0.0.1:5003", "127.0.0.1:5004"},
-		}}
-		//for _, proxy := range g.proxyPool.proxies {
-		for _, proxy := range mockProxies {
+		}}*/
+		for _, proxy := range g.proxyPool.proxies {
+			//for _, proxy := range mockProxies {
 			paths = append(paths, proxy.Paths[:])
 		}
 		data, err := json.Marshal(map[string][][]string{

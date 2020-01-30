@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"reflect"
 	"runtime"
 	"time"
 	"github.com/simonwicky/Peerster/utils"
@@ -87,17 +88,39 @@ of fast lookup insertion deletion, and to be able to store multiple cloves from 
 but not store many of the same exact cloves from the same exact predecessor
 */
 type ClovesCollector struct {
-	handler chan IncomingClove
-	directs chan *utils.Clove
-	cloves  map[string]map[string]map[uint32]*utils.Clove
+	handler      chan IncomingClove
+	directs      chan *utils.Clove
+	cloves       map[string]map[string]map[uint32]*utils.Clove
+	routingTable map[string]string // records previous hop -> next hop
 }
 
 func NewClovesCollector(g *Gossiper) *ClovesCollector {
-	cc := &ClovesCollector{handler: make(chan IncomingClove), directs: make(chan *utils.Clove), cloves: make(map[string]map[string]map[uint32]*utils.Clove)}
+	cc := &ClovesCollector{
+		handler:      make(chan IncomingClove),
+		directs:      make(chan *utils.Clove),
+		cloves:       make(map[string]map[string]map[uint32]*utils.Clove),
+		routingTable: make(map[string]string),
+	}
 	cc.manage(g)
 	return cc
 }
 
+func CloneValue(source interface{}, destin interface{}) {
+	x := reflect.ValueOf(source)
+	if x.Kind() == reflect.Ptr {
+		starX := x.Elem()
+		y := reflect.New(starX.Type())
+		starY := y.Elem()
+		starY.Set(starX)
+		reflect.ValueOf(destin).Elem().Set(y.Elem())
+	} else {
+		destin = x.Interface()
+	}
+}
+
+/*
+Add is a thread unsafe method to add a clove to the collector(it is meant to be used in a isolated context)
+*/
 func (cc *ClovesCollector) Add(clove *utils.Clove, predecessor string) bool {
 	var sequenceNumber string = string(clove.SequenceNumber)
 	//make sure there is storage for that sequence number
@@ -111,14 +134,14 @@ func (cc *ClovesCollector) Add(clove *utils.Clove, predecessor string) bool {
 	//store the clove; make sure to deep copy clove data
 	idx := clove.Index
 	if _, ok := cc.cloves[sequenceNumber][predecessor][idx]; !ok {
-
 		cc.cloves[sequenceNumber][predecessor][idx] = &utils.Clove{
 			Index:          clove.Index,
-			SequenceNumber: clove.SequenceNumber,
 			Threshold:      clove.Threshold,
-			Data:           []byte(string(clove.Data)),
+			Data:           make([]byte, len(clove.Data)),
+			SequenceNumber: make([]byte, len(clove.SequenceNumber)),
 		}
-		//copy(cc.cloves[sequenceNumber][predecessor][idx].Data, clove.Data)
+		copy(cc.cloves[sequenceNumber][predecessor][idx].SequenceNumber[:], clove.SequenceNumber[:])
+		copy(cc.cloves[sequenceNumber][predecessor][idx].Data[:], clove.Data[:])
 		return true
 	}
 	//check if the threshold is met for that sequence numnber
@@ -143,6 +166,11 @@ func (cc *ClovesCollector) MeetsThreshold(sn string, k uint32) (bool, []*utils.C
 	return false, []*utils.Clove{}, []string{}
 }
 
+/*
+pathsCovered given the cloves received for a particular sequence number returns a list of all the clove indices, paths that are available (where a proxy wasn't already discovered
+and the "inverted" sequence of cloves from index to a list of predecessors). Its purpose is
+to help find k cloves coming from different paths and having different indices
+*/
 func pathsCovered(seq map[string]map[uint32]*utils.Clove, k uint32) ([]uint32, map[string]bool, map[uint32][]string) {
 	invertedSeq := make(map[uint32][]string) //map[index][]predecessor
 	availablePaths := make(map[string]bool)
@@ -175,7 +203,10 @@ func removeAtI(i int, a []uint32) []uint32 {
 }
 
 /*
-getKIndependentCloves
+getKIndependentCloves returns a tuple of a boolean indicating whether k different cloves have come from
+k different paths, the list of cloves if it exists and the list of paths if they exist.
+The subtlety is that if many cloves came from the same path (which can happen with loops),
+then we get to choose which clove of that path contribute to recovering the message.
 -
 */
 func getKIndependentCloves(k uint32, seq map[string]map[uint32]*utils.Clove, pathIsAvailable map[string]bool, indices []uint32, inv map[uint32][]string, resa []*utils.Clove, resb []string) (bool, []*utils.Clove, []string) {
@@ -183,12 +214,18 @@ func getKIndependentCloves(k uint32, seq map[string]map[uint32]*utils.Clove, pat
 		return true, resa, resb
 	}
 	//fmt.Println(res, k, indices)
-	for i, index := range indices {
+	for _, index := range indices {
 		for _, predecessor := range inv[index] {
 			if pathIsAvailable[predecessor] {
 				pathIsAvailable[predecessor] = false
 				//check if seen[string(seq[predecessor][index].Data)]
-				if ok, cloves, paths := getKIndependentCloves(k-1, seq, pathIsAvailable, removeAtI(i, indices), inv, append(resa, seq[predecessor][index]), append(resb, predecessor)); ok {
+				newIndices := make([]uint32, 0)
+				for _, other := range indices {
+					if other != index {
+						newIndices = append(newIndices, other)
+					}
+				}
+				if ok, cloves, paths := getKIndependentCloves(k-1, seq, pathIsAvailable, newIndices, inv, append(resa, seq[predecessor][index]), append(resb, predecessor)); ok {
 					return true, cloves, paths
 				}
 			}
@@ -203,24 +240,24 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 	logger := utils.LogObj.Named("rec")
 
 	//store clove by sequence number
-	if cc.Add(clove, predecessor) {
-		logger.Debug("added clove: ", string(clove.Data), " of ", sequenceNumber, " from ", predecessor)
-	}
+	cc.Add(clove, predecessor)
 	forwarding := false
 	p := 0.8
 	if met, cloves, paths := cc.MeetsThreshold(sequenceNumber, clove.Threshold); met {
-		logger.Debug("recovered clove from", paths)
+		//logger.Debug("recovered clove from", paths)
 		df, err := utils.NewDataFragment(cloves)
 		if err == nil {
+			logger.Debug(g.Name, "recovered clove")
 			switch {
 			case df.Proxy != nil:
 				if df.Proxy.Forward {
 					if df.Proxy.SessionKey == nil {
-						output, err := utils.NewProxyAccept().Split(2, 2)
+						output, err := utils.NewProxyAccept(g.directProxyPort).Split(2, 2)
 						if err == nil {
 							//accept to be a proxy
 							for i, path := range paths {
-								logger.Debug("sent accept clove to ", path)
+								//logger.Debug("sent accept clove to ", path)
+								logger.Debug("sending ACCEPT to ", path)
 								g.sendToPeer(path, output[i].Wrap())
 							}
 						}
@@ -232,7 +269,9 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 					var fixPaths [2]string
 					copy(fixPaths[:], paths[:2])
 					// record proxy and send session key
-					g.newProxies <- &Proxy{Paths: fixPaths}
+					if df.Proxy.IP != nil && df.Proxy.SessionKey != nil {
+						g.newProxies <- &Proxy{Paths: fixPaths, IP: *df.Proxy.IP, SessionKey: *df.Proxy.SessionKey}
+					}
 				}
 			case df.Delivery != nil: // this is read by a provider proxy
 				//directly connect by TCP to proxy provided
@@ -263,31 +302,44 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 		} else {
 			data := []string{}
 			for _, clove := range cloves {
-				data = append(data, fmt.Sprintf("%d::%s", clove.Index, string(clove.Data)))
+				data = append(data, fmt.Sprintf("%d::%s ", clove.Index, string(clove.Data)))
 			}
-			logger.Fatal(err.Error(), data)
+			logger.Fatal(err.Error(), data, cc.cloves[sequenceNumber])
 			forwarding = true
 		}
 	} else {
 		forwarding = true
 	}
 	if forwarding { // !full
-		//forward to one random neighbour
-		if rand.Float64() < p {
-			if successor := g.getRandomPeer(predecessor); successor != nil {
-				utils.LogObj.Named("fwd").Debug("forwarding clove to ", *successor)
-				g.sendToPeer(*successor, clove.Wrap())
-			} else {
-				logger.Warn("could not get a successor!")
+		if successor, ok := cc.routingTable[predecessor]; ok && successor != g.addressPeer.String() {
+			g.sendToPeer(successor, clove.Wrap())
+		} else {
+			//forward to one random neighbour
+			if rand.Float64() < p {
+				if successor := g.getRandomPeer(predecessor); successor != nil {
+					utils.LogObj.Named("fwd").Debug("forwarding clove to ", *successor)
+					cc.routingTable[predecessor] = *successor
+					cc.routingTable[*successor] = predecessor
+					g.sendToPeer(*successor, clove.Wrap())
+				} else {
+					logger.Warn("could not get no successor!")
+				}
 			}
 		}
+
 	}
 }
+
+/*
+manage is a forwarder/handler of cloves coupled with a state resetter that will delete all the cloves
+every x seconds
+*/
 func (cc *ClovesCollector) manage(g *Gossiper) {
 	if g == nil {
 		return
 	}
 	logger := utils.LogObj.Named("man")
+	cleaningTime := time.NewTicker(15 * time.Second)
 	go func() {
 		for {
 			select {
@@ -295,7 +347,7 @@ func (cc *ClovesCollector) manage(g *Gossiper) {
 			// look up "cloves routing table" and forward
 			case newClove := <-cc.handler:
 				cc.cloveHandler(g, newClove.clove, newClove.predecessor)
-			case <-time.After(15 * time.Second):
+			case <-cleaningTime.C:
 				logger.Debug("clearing cloves", len(cc.cloves))
 				cc.cloves = make(map[string]map[string]map[uint32]*utils.Clove)
 				runtime.GC()

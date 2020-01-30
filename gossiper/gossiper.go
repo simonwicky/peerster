@@ -178,12 +178,12 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		duration, _ := time.ParseDuration(strconv.Itoa(rtimer) + "s")
 		rTimerTicker = time.NewTicker(duration)
 	}
-
+	/*
 	if peersNumber == 0 {
 		fmt.Println(peers)
 		fmt.Fprintln(os.Stderr, "Number of peers should be > 0")
 		return nil
-	}
+	}*/
 
 	g:= &Gossiper{
 		addressPeer: udpAddrPeer,
@@ -257,7 +257,7 @@ func getTuple(n uint, pathsTaken map[string]bool, peers []string) ([]string, map
 			}
 		}
 	}
-	return tuple[:i], pathsTaken, fmt.Errorf("Not enough available paths in %s of %v !", peers, pathsTaken)
+	return tuple[:i], pathsTaken, errors.New(fmt.Sprint("Not enough available paths in", peers, "of", pathsTaken, "!"))
 }
 
 /*
@@ -267,6 +267,7 @@ type Proxy struct {
 	Paths      [2]string
 	SessionKey []byte
 	ProxySN    []byte
+	IP         string
 }
 
 /*
@@ -336,7 +337,7 @@ func (g *Gossiper) initiate(pathsTaken map[string]bool) map[string]bool {
 			utils.LogObj.Fatal(err.Error())
 		}
 	} else {
-		utils.LogObj.Warn(err.Error())
+		//utils.LogObj.Warn(err.Error())
 	}
 	return pathsStillAvailable
 }
@@ -389,9 +390,8 @@ func (g *Gossiper) Start(simple bool, port string) {
 	}
 	go g.rumorRoute()
 	go g.HttpServerHandler(port)
-    //go g.initiator(3, g.knownPeers, nil)
+	go g.initiator(3, g.knownPeers, nil)
 	//go g.proxySrv()
-
 	g.PeersHandle(simple)
 }
 
