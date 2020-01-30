@@ -36,18 +36,18 @@ func NewGCFileSearcher(g *Gossiper) *GCFileSearcher {
 }
 
 //Start the file search given the specified keywords
-func (s *GCFileSearcher) startSearch(keywords []string){
+func (s *GCFileSearcher) startSearch(keywords []string, sessionKey *[]byte){
 	s.running = true
 	s.keywords = keywords
 	s.matches = make([]*Match,0)
-	s.search(keywords)
+	s.search(keywords, sessionKey)
 	s.running = false
 
 	
 	//s.handleReply()
 }
 
-func (s *GCFileSearcher) search(keyword []string){
+func (s *GCFileSearcher) search(keyword []string, sessionKey *[]byte){
 	randBytes := make([]byte, 4)
 	_, err := crand.Read(randBytes)
 	if err != nil {
@@ -61,6 +61,13 @@ func (s *GCFileSearcher) search(keyword []string){
 			Keywords : s.keywords,
 			HopLimit:s.g.GCSearchHopLimit,
 	}
+
+	if sessionKey != nil {
+		searchRequest.SessionKey = make([]byte, len(*sessionKey))
+		copy(searchRequest.SessionKey, *sessionKey)
+
+	}
+
 	fmt.Println("New GC search ID ", searchRequest.ID)
 	if !s.running {
 		return

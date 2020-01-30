@@ -390,7 +390,7 @@ func (g *Gossiper) Start(simple bool, port string) {
 	}
 	go g.rumorRoute()
 	go g.HttpServerHandler(port)
-	go g.initiator(3, g.knownPeers, nil)
+	//go g.initiator(3, g.knownPeers, nil)
 	//go g.proxySrv()
 	g.PeersHandle(simple)
 }

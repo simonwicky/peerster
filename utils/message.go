@@ -16,6 +16,7 @@ type Message struct {
 	Budget *uint64
 	Keywords *string
 	GC *bool
+	UseProxy *bool
 }
 
 type SimpleMessage struct {
@@ -88,6 +89,7 @@ type GCSearchRequest struct {
 	Keywords []string
 	ProxiesIP *[]string
 	HopLimit uint32
+	SessionKey []byte
 }
 
 
@@ -156,6 +158,8 @@ type DataFragment struct {
 	Query    *Query
 	Content  *Content
 	Delivery *Delivery
+	FileInfo *FileInfo
+	GCSearchRequest *GCSearchRequest
 }
 
 /*
@@ -230,6 +234,8 @@ type ProxyRequest struct {
 
 type Query struct {
 	Keywords []string
+	SessionKey []byte
+
 }
 
 type Content struct {

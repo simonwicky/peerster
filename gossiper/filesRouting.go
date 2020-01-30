@@ -18,6 +18,7 @@ type FilesRouting struct {
 type FileRoutes struct {
 	FileInfo utils.FileInfo
 	Routes []string
+	ProxyOwnerPaths []string
 	ClovesPath []string
 }
 
@@ -32,11 +33,28 @@ func NewFilesRouting() *FilesRouting {
 	return &FilesRouting{filesRoutes: make(map[string]*FileRoutes)}
 }
 
-func (filesRouting *FilesRouting) GetRoutes(metaFileHash string) []string{
+func (filesRouting *FilesRouting) addOwnerPath(fileInfo utils.FileInfo,  paths[]string){
+
+	if fileRoutes, found := filesRouting.filesRoutes[ fileInfo.Name]; found {
+		if len(fileRoutes.ProxyOwnerPaths)==0{
+			fileRoutes.ProxyOwnerPaths = make([]string, len(paths))	
+			copy(fileRoutes.ProxyOwnerPaths, paths)
+		}
+	}else {
+		froute := &FileRoutes{
+			FileInfo:fileInfo, 
+			ProxyOwnerPaths: make([]string, len(paths)),
+		}
+		copy(froute.ProxyOwnerPaths, paths)	
+	}
+}
+
+
+func (filesRouting *FilesRouting) GetRoutes(fname string) []string{
 	filesRouting.Lock()
 	defer filesRouting.Unlock()
 	var routes []string
-	if fileRoutes, found := filesRouting.filesRoutes[metaFileHash]; found{
+	if fileRoutes, found := filesRouting.filesRoutes[fname]; found{
 		routes = fileRoutes.Routes
 	}
 	return routes

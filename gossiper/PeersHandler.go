@@ -295,7 +295,9 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 				//index file
 			case df.Query != nil :
 				searcher := g.getGCFileSearcher()
-				go searcher.startSearch(df.Query.Keywords)
+			go searcher.startSearch(df.Query.Keywords, &df.Query.SessionKey)
+			case df.FileInfo != nil:
+				g.FilesRouting.addOwnerPath(*df.FileInfo,paths)
 			}
 			
 			
@@ -485,7 +487,7 @@ func (g *Gossiper) peerTLCAckHandler(packet *utils.GossipPacket) {
 }
 
 func (g *Gossiper) peerGCSearchRequestHandler(packet *utils.GossipPacket){
-	//fmt.Println("bitch")
+	logger := utils.LogObj.Named("GCSearch")
 	request := packet.GCSearchRequest
 	searcher := g.getGCFileSearcher()
 	searcher.repliesMux.Lock()
@@ -509,12 +511,40 @@ func (g *Gossiper) peerGCSearchRequestHandler(packet *utils.GossipPacket){
 		var foundFiles []*FileData
 		keywords := packet.GCSearchRequest.Keywords
 		for _, kw := range keywords {
-			foundFiles = append(foundFiles, g.fileStorage.lookupFile(kw)...)
 			//Assuming there is consensus over the file names 
-			if ips :=packet.GCSearchRequest.ProxiesIP; ips != nil && len(keywords) == 1 && foundFiles[0].name == keywords[0] {
-				fmt.Println("Deliver file ", kw)
-				g.deliver(kw, *ips)
+			if ips :=packet.GCSearchRequest.ProxiesIP; ips != nil && len(keywords) == 1 {
+				foundFiles = append(foundFiles, g.fileStorage.lookupFile(kw)...)
+
+				if  foundFiles[0].name == keywords[0]{
+
+					fmt.Println("Deliver file ", kw)
+					g.deliver(kw, *ips)
+				}else {
+					g.FilesRouting.Lock()
+					if len(g.FilesRouting.filesRoutes[keywords[0]].ProxyOwnerPaths) == 2{
+						data := &utils.DataFragment{
+							GCSearchRequest: packet.GCSearchRequest,
+						}
+
+						cloves, err := data.Split(2,2)
+						if err != nil {
+							fmt.Println("Error forwarding GCSearchRequest to content holder")
+						}else {
+							paths :=  g.FilesRouting.filesRoutes[keywords[0]].ProxyOwnerPaths
+							for i, path := range paths{
+								g.sendToPeer(path, cloves[i].Wrap())
+							}
+							logger.Debug("Forwarding search request to content holder via anonymous paths", paths)
+
+						}
+					}
+					g.FilesRouting.Unlock()
+				}
+
 			}
+
+
+
 		}
 		if len(foundFiles) < int(searcher.matchThreshold) {
 			searcher.manageRequest(packet.GCSearchRequest)

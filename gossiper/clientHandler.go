@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
-
+	"math/rand"
 	"github.com/simonwicky/Peerster/utils"
 	"go.dedis.ch/protobuf"
 )
@@ -116,10 +116,43 @@ func (g *Gossiper) clientFileSearchHandler(message *utils.Message) {
 
 func(g *Gossiper) clientGCFileSearchHandler(message *utils.Message) {
 	searcher := g.getGCFileSearcher()
-	if !searcher.running {
-		keywords := strings.Split(*message.Keywords,",")
-		go searcher.startSearch(keywords)
-	} else {
-		fmt.Fprintln(os.Stderr,"File search already running")
+	if message.UseProxy != nil && *message.UseProxy{
+		data := utils.DataFragment{
+			Query: &utils.Query{Keywords: strings.Split(*message.Keywords,",")},
+		}
+		logger := utils.LogObj.Named("postFile")
+		d := uint(len(g.proxyPool.proxies))
+
+		//get file from filestorage
+		providerProxies, err := g.proxyPool.GetD(d)
+		if err != nil {
+			logger.Fatal(err.Error())
+			return
+		}
+		for _, proxy := range providerProxies {
+			sessionKey := make([]byte, g.settings.SessionKeySize)
+			rand.Read(sessionKey)
+			data.Query.SessionKey = sessionKey
+			cloves, err := data.Split(2, 2) // normally we should collect all cloves to make sure that no error occurs
+			if err != nil {
+				logger.Fatal(err.Error())
+				return
+			}
+			for j, clove := range cloves {
+				g.sendToPeer(proxy.Paths[j], clove.Wrap())
+			}
+		}
+		
+	}else {
+		if !searcher.running {
+			keywords := strings.Split(*message.Keywords,",")
+			go searcher.startSearch(keywords, nil)
+		} else {
+			fmt.Fprintln(os.Stderr,"File search already running")
+		}
 	}
+	
+
+
+
 }

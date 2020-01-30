@@ -193,22 +193,22 @@ object TestSearchDelivery extends App {
         }
         
         val printFatals: String => String => Unit = (name: String) => (line: String) => {
-            if (line.contains( "FATAL" )/*|| line.contains( "WARN")*/) {
-                println(s"$name> $line")
+            if (line.contains( "FATAL" ) && !line.contains("invalid padding") || line.contains( "WARN")) {
+                //println(s"$name> $line")
             }
         }
         //create map instead
         val testCases: List[String => String => Unit] = List(hasMultipleProxies).map(i => ((s: String) => printFilter(l => !l.contains("enough available") , line => line) (s) )) ++ 1.until(peersters.size)
         .map(i => ((s: String) => printFatals(s)))
-        .map(i => ((s: String) => printFilter(l => l contains ".txt", line => line) (s) ))
+        //.map(i => ((s: String) => printFilter(l => l contains ".txt", line => line) (s) ))
 
         //"go build" ! 
         //put timeout instead
         peersters.zip(testCases) map { case (p, fn) => p.run(fn) }// foreach { case f => Await.result(f, Duration.Inf)}
-                Thread.sleep(5000)
+                Thread.sleep(10000)
 
         for (p <- peersters ){
-                    filesStore.createFileFor(p)
+            filesStore.createFileFor(p)
         }
         Thread.sleep(5000)
 

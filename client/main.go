@@ -22,6 +22,7 @@ func main() {
 	var keywords = flag.String("keywords","","Keywords for perforimg a search")
 	var budget = flag.Uint64("budget",2,"budget for the file search")
 	var gc  = flag.Bool("garlic", false, "set to true with the search arguments to activate the garlic cast search")
+	var useProxy  = flag.Bool("useProxy", false, "set to true with the search arguments to delegate the search the proxies")
 	flag.Parse()
 
 	//flag for file request
@@ -64,7 +65,7 @@ func main() {
 		if !*gc {
 			message = utils.Message{Budget : budget, Keywords: keywords}
 		}else {
-			message = utils.Message{GC : gc, Keywords: keywords}
+			message = utils.Message{GC : gc, Keywords: keywords, UseProxy: useProxy}
 		}
 		send(&message, GOSSIPER_ADDRESS + ":" + *uiPort)
 		return
