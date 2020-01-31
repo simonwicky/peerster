@@ -1,0 +1,5 @@
+./Peerster --UIPort 12345 --gossipAddr 127.0.0.1:5000 --name PeerA --peers 127.0.0.1:5001 --antientropy 10 --rtimer 10 --GUIPort 8080 --stubbornTimeout 10 --N 2
+./Peerster --UIPort 12346 --gossipAddr 127.0.0.1:5001  --name PeerB --peers 127.0.0.1:5000 --antientropy 10 --rtimer 10 --GUIPort 8081 --stubbornTimeout 10 --N 2
+./client --UIPort 12346 --file EPFL.gif
+./client --UIPort 12345  --keywords hey --garlic true
+ 

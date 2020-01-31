@@ -80,7 +80,7 @@ func (filesRouting *FilesRouting) RoutesSorted(keywords []string) []FileRoutes {
 //Updates the routing table according to the search reply
 func (filesRouting *FilesRouting) UpdateRouting(reply utils.GCSearchReply){
 	//fmt.Println("print before Update files routing table")
-	utils.LogGCSearchReply(&reply)
+	//utils.LogGCSearchReply(&reply)
 
 	for _, result := range reply.AccessibleFiles {
 		//if len(result.ChunkMap) == int(result.ChunkCount){

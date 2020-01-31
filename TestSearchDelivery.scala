@@ -60,7 +60,7 @@ object TestSearchDelivery extends App {
         }
         override def toString = i.toString
     }
-    
+    val c = Counter(9000)
     val gossip = Counter(6001)
     val ui = Counter(7000)
     var n = Counter(0)
@@ -68,6 +68,7 @@ object TestSearchDelivery extends App {
     var nbPeersLaunched = 0
         }
     case class Peerster(val name: String) {
+        val tcp = c.next
         var peers: Set[String] = Set()
         var filters = List[String]()
         val uip = ui.next
@@ -77,7 +78,7 @@ object TestSearchDelivery extends App {
         def rtimer = "-rtimer 10"
         def ps = if (peers.size > 0) s"-peers ${peers mkString ","}" else ""
         def fs = if(filters.size > 0) s"-filter ${filters mkString ","}" else ""
-        def cmd = s"./peerster -name $name -UIPort $uip -gossipAddr $gossipAddr -N $n $ps $fs $antientropy $rtimer"
+        def cmd = s"./peerster -name $name -UIPort $uip -gossipAddr $gossipAddr -proxy $tcp $ps $fs $antientropy $rtimer"
         def knows(peerster: Peerster): Peerster = {
             peers = peers + peerster.gossipAddr
             this
@@ -210,7 +211,7 @@ object TestSearchDelivery extends App {
         //create map instead
         val testCases: List[String => String => Unit] = List(hasMultipleProxies).map(i => ((s: String) => printFilter(l => !l.contains("enough available") , line => line) (s) )) ++ 1.until(peersters.size)
         .map(i => ((s: String) => printFatals(s)))
-        //.map(i => ((s: String) => printFilter(l => l contains ".txt", line => line) (s) ))
+        .map(i => ((s: String) => printFilter(l => true /*l contains ".txt"*/, line => line) (s) ))
 
         //"go build" ! 
         //put timeout instead

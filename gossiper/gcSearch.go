@@ -31,7 +31,6 @@ func (g *Gossiper) peerGCSearchRequestHandler(packet *utils.GossipPacket){
 
 	}
 	searcher.repliesMux.Unlock()
-	
 	if !alreadyReceived{
 
 		var foundFiles []*FileData
@@ -41,7 +40,8 @@ func (g *Gossiper) peerGCSearchRequestHandler(packet *utils.GossipPacket){
 			if ips :=packet.GCSearchRequest.ProxiesIP; ips != nil /*&& len(keywords) == 1*/ {
 				foundFiles = append(foundFiles, g.fileStorage.lookupFile(kw)...)
 
-				if  foundFiles[0].name == kw{
+				if  len(foundFiles) > 0 && foundFiles[0].name == kw{
+					fmt.Println(1)
 
 					fmt.Println("Deliver file ", kw)
 					g.deliver(kw, *ips)
@@ -51,6 +51,7 @@ func (g *Gossiper) peerGCSearchRequestHandler(packet *utils.GossipPacket){
 						data := &utils.DataFragment{
 							GCSearchRequest: packet.GCSearchRequest,
 						}
+						fmt.Println(2)
 
 						cloves, err := data.Split(2,2)
 						if err != nil {
@@ -69,9 +70,11 @@ func (g *Gossiper) peerGCSearchRequestHandler(packet *utils.GossipPacket){
 
 			}
 
+			fmt.Println(3)
 
 
 		}
+		fmt.Println(4)
 		if len(foundFiles) < int(searcher.matchThreshold) {
 			searcher.manageRequest(packet.GCSearchRequest)
 		}
@@ -84,7 +87,7 @@ func (g *Gossiper) peerGCSearchRequestHandler(packet *utils.GossipPacket){
 			Failure: false,
 			HopLimit:g.GCSearchHopLimit,
 		}
-		utils.LogGCSearchReply(reply)
+		//utils.LogGCSearchReply(reply)
 		g.sendPointToPoint(&utils.GossipPacket{GCSearchReply:reply}, packet.GCSearchRequest.Origin)
 	}
 }

@@ -1,4 +1,8 @@
-//Author: Boubacar Camara
+/*
+Author: Boubacar Camara
+
+Run with cmd: go test gossiper/filesRouting.go gossiper/filesRouting_test.go
+*/
 package gossiper
 
 import (
@@ -60,11 +64,11 @@ func checkArrays(t *testing.T, a1, b1 []string){
 }
 func TestBasicTableUpdates(t *testing.T){
 	table := NewFilesRouting()
-	table.UpdateRouting(createGCSearchReply("A", []string{"f1", "f2"}))
-	table.UpdateRouting(createGCSearchReply("B", []string{"f32", "f2"}))
-	table.UpdateRouting(createGCSearchReply("A", []string{"f3"}))
+	table.UpdateRouting(*createGCSearchReply("A", []string{"f1", "f2"}))
+	table.UpdateRouting(*createGCSearchReply("B", []string{"f32", "f2"}))
+	table.UpdateRouting(*createGCSearchReply("A", []string{"f3"}))
 	//Add again to make sure there is no duplicated file
-	table.UpdateRouting(createGCSearchReply("A", []string{"f3"}))
+	table.UpdateRouting(*createGCSearchReply("A", []string{"f3"}))
 
 	//t.Log(table.GetAllRoutes())
 
