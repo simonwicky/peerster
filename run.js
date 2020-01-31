@@ -1,3 +1,4 @@
+//Author: Frédéric Gessler
 const express = require('express')
 var cors = require('cors')
 var bodyParser = require('body-parser')

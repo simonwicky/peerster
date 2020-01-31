@@ -1,3 +1,4 @@
+//Author: Frédéric Gessler
 import scala.language.postfixOps
 import sys.process._
 import scala.concurrent._

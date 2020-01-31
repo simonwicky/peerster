@@ -25,11 +25,11 @@ func main() {
 	var hw3ex3 = flag.Bool("hw3ex3", false, "Enable TLC Round")
 	var hw3ex4 = flag.Bool("hw3ex4", false, "Enable QSC")
 	var filters = flag.String("filter", "", "activated log tags")
-
+	var proxy = flag.String("proxy", ":666", "direct proxy port")
 	var _ = flag.Bool("ackall", true, "Ack everything")
 	flag.Parse()
 	utils.LogObj.Filter(*filters)
-	gossiper := gossiper.NewGossiper("127.0.0.1:"+*udpPort, *gossipAddr, *name, *peers, *antiEntropy, *rtimer, *hoplimit, *numberPeers, *stubbornTimeout, *hw3ex2, *hw3ex3, *hw3ex4)
+	gossiper := gossiper.NewGossiper("127.0.0.1:"+*udpPort, *gossipAddr, *name, *peers, *antiEntropy, *rtimer, *hoplimit, *numberPeers, *stubbornTimeout, *hw3ex2, *hw3ex3, *hw3ex4, *proxy)
 	if gossiper == nil {
 		fmt.Println("Could not initialize ",name)
 		fmt.Fprintln(os.Stderr, "Problem initializing gossiper")
