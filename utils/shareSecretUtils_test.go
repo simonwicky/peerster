@@ -1,3 +1,4 @@
+//Authored by Simon Wicky
 package utils
 
 import ("testing"
