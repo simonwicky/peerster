@@ -206,7 +206,7 @@ func (logger *Logger) Filter(filters string) {
 func defaultLogger() *Logger {
 	return &Logger{
 		warnings: true,
-		debugs:   true,
+		debugs:   false,
 		fatals:   true,
 		name:     "default",
 		named:    false,

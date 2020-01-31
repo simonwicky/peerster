@@ -32,7 +32,7 @@ func (g *Gossiper) peerGCSearchRequestHandler(packet *utils.GossipPacket){
 	}
 	searcher.repliesMux.Unlock()
 	if !alreadyReceived{
-
+		fmt.Println("Process GCSearchRequest")
 		var foundFiles []*FileData
 		keywords := packet.GCSearchRequest.Keywords
 		for _, kw := range keywords {
@@ -41,17 +41,19 @@ func (g *Gossiper) peerGCSearchRequestHandler(packet *utils.GossipPacket){
 				foundFiles = append(foundFiles, g.fileStorage.lookupFile(kw)...)
 
 				if  len(foundFiles) > 0 && foundFiles[0].name == kw{
-					fmt.Println(1)
 
 					fmt.Println("Deliver file ", kw)
 					g.deliver(kw, *ips)
 				}else {
+					fmt.Println("Check routing table")
+
 					g.FilesRouting.Lock()
-					if len(g.FilesRouting.filesRoutes[kw].ProxyOwnerPaths) == 2{
+					if 	froutes,found := g.FilesRouting.filesRoutes[kw];found && len(froutes.ProxyOwnerPaths) == 2{
+						fmt.Println("Checked proxy owner")
+
 						data := &utils.DataFragment{
 							GCSearchRequest: packet.GCSearchRequest,
 						}
-						fmt.Println(2)
 
 						cloves, err := data.Split(2,2)
 						if err != nil {
@@ -64,17 +66,13 @@ func (g *Gossiper) peerGCSearchRequestHandler(packet *utils.GossipPacket){
 							logger.Debug("Forwarding search request to content holder via anonymous paths", paths)
 
 						}
+
 					}
 					g.FilesRouting.Unlock()
 				}
 
 			}
-
-			fmt.Println(3)
-
-
 		}
-		fmt.Println(4)
 		if len(foundFiles) < int(searcher.matchThreshold) {
 			searcher.manageRequest(packet.GCSearchRequest)
 		}
