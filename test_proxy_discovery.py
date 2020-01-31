@@ -1,3 +1,4 @@
+#Author: Frédéric Gessler
 import subprocess
 from functools import reduce
 import signal

@@ -1,10 +1,7 @@
 package gossiper
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -17,15 +14,6 @@ import (
 	"github.com/simonwicky/Peerster/utils"
 	"go.dedis.ch/protobuf"
 )
-
-type Settings struct {
-	SessionKeySize uint
-	Buffering      uint
-	Redundancy     uint          // number of cloves sent for any threshold
-	DiscoveryRate  time.Duration // period of proxy discovery
-	Connectivity   uint          // d used in the paper = number of proxies for search for example
-	ProxyMocking   bool
-}
 
 type Gossiper struct {
 	//network
@@ -109,7 +97,7 @@ type Gossiper struct {
 	directProxyPort string
 }
 
-func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer, hoplimit, peersNumber, stubbornTimeout int, hw3ex2, hw3ex3, hw3ex4 bool) *Gossiper {
+func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer, hoplimit, peersNumber, stubbornTimeout int, hw3ex2, hw3ex3, hw3ex4 bool, directproxyport string) *Gossiper {
 	rand.Seed(time.Now().Unix())
 	udpAddrPeer, err := net.ResolveUDPAddr("udp4", address)
 	if err != nil {
@@ -201,6 +189,7 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		stubbornTimeout:   time.Duration(stubbornTimeout),
 		hw3ex2:            hw3ex2,
 		hw3ex3:            hw3ex3,
+		directProxyPort:   fmt.Sprintf("127.0.0.1:%s", directproxyport),
 		hw3ex4:            hw3ex4,
 		consensus:         NewConsensus(),
 		settings: &Settings{
@@ -208,7 +197,7 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 			Buffering:      10,
 			Redundancy:     3,
 			DiscoveryRate:  4,
-			ProxyMocking:   true,
+			ProxyMocking:   false,
 		},
 		newProxies: make(chan *Proxy, 100),
 		proxyPool:  &ProxyPool{proxies: make([]*Proxy, 0)},
@@ -216,156 +205,6 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 	}
 	g.clovesCollector = NewClovesCollector(g)
 	return g
-}
-
-/*type Proxy struct {
-	Paths     [2]*net.UDPAddr
-	PublicKey crypto.PublicKey
-}*/
-
-/*
-getTuple returns n paths
-*/
-func getTuple(n uint, pathsTaken map[string]bool, peers []string) ([]string, map[string]bool, error) {
-	//shuffle known peers
-	rand.Shuffle(len(peers), func(i, j int) {
-		tmp := peers[i]
-		peers[i] = peers[j]
-		peers[j] = tmp
-	})
-	tuple := make([]string, n)
-	var i uint = 0
-	for _, peer := range peers {
-		if taken, ok := pathsTaken[peer]; !ok || !taken {
-			tuple[i] = peer
-			i++
-			pathsTaken[peer] = true
-			if i >= n {
-				return tuple, pathsTaken, nil
-			}
-		}
-	}
-	return tuple[:i], pathsTaken, errors.New(fmt.Sprint("Not enough available paths in", peers, "of", pathsTaken, "!"))
-}
-
-/*
-Proxy describes a proxy in an abstract manner
-*/
-type Proxy struct {
-	Paths      [2]string
-	SessionKey []byte
-	ProxySN    []byte
-	IP         string
-}
-
-/*
-ProxyPool is a thread-safe store for proxies with convenience methods
-*/
-type ProxyPool struct {
-	sync.RWMutex
-	proxies []*Proxy
-}
-
-/*
-Cover returns a map of all the paths taken by the pool's proxies in aggregate
-*/
-func (pool *ProxyPool) Cover() map[string]bool {
-	pathsTaken := map[string]bool{}
-	for _, proxy := range pool.proxies {
-		pathsTaken[proxy.Paths[0]] = true
-		pathsTaken[proxy.Paths[1]] = true
-	}
-	return pathsTaken
-}
-
-/*
-Add adds a new proxy to the pool
-*/
-func (pool *ProxyPool) Add(proxy *Proxy) {
-	pool.Lock()
-	defer pool.Unlock()
-	pool.proxies = append(pool.proxies, proxy)
-}
-
-/*
-GetD returns d random proxies from the ProxyPool
-*/
-func (pool *ProxyPool) GetD(d uint) ([]*Proxy, error) {
-	pool.Lock()
-	defer pool.Unlock()
-	if uint(len(pool.proxies)) < d {
-		return nil, errors.New("could not find d proxies")
-	}
-	rand.Shuffle(len(pool.proxies), func(i, j int) {
-		tmp := pool.proxies[i]
-		pool.proxies[i] = pool.proxies[j]
-		pool.proxies[j] = tmp
-	})
-	return pool.proxies[:d], nil
-}
-
-/*
-initiate creates a new proxy init message,
-splits it in n cloves, gets n paths from the known peers
-and sends a clove to each path
-*/
-func (g *Gossiper) initiate(pathsTaken map[string]bool) map[string]bool {
-	knownPeers := g.knownPeers
-	//series := utils.LogObj.Named("init")
-	tuple, pathsStillAvailable, err := getTuple(g.settings.Redundancy, pathsTaken, knownPeers)
-	if err == nil {
-		cloves, err := utils.NewProxyInit().Split(2, g.settings.Redundancy)
-		//test
-		if err == nil {
-			for i, clove := range cloves {
-				//series.Debug(string(clove.SequenceNumber), "(", i, ") = ", string(clove.Data))
-				g.sendToPeer(tuple[i], clove.Wrap())
-			}
-		} else {
-			utils.LogObj.Fatal(err.Error())
-		}
-	} else {
-		//utils.LogObj.Warn(err.Error())
-	}
-	return pathsStillAvailable
-}
-
-/*
-initiator maintains a proxy pool by periodically trying to discover new ones
-BIG QUESTION: is it enough to take distincts pairs or do _ALL_ the paths have to be distinct
-	- distinct pairs:
-	- distinct paths:
-
-	let's assume distinct paths(one path = one and only one proxy)
-*/
-func (g *Gossiper) initiator(n uint, peersAtBootstrap []string, peersUpdates chan []string) {
-	logger := utils.LogObj.Named("init")
-	pathsTaken := map[string]bool{}
-	pool := g.proxyPool
-	g.initiate(pathsTaken)
-	ini := time.NewTicker(time.Second * g.settings.DiscoveryRate)
-	for {
-		select {
-		case <-ini.C:
-			pathsTaken = pool.Cover()
-			//initiate proxy search
-			pathsTaken = g.initiate(pathsTaken)
-		case newProxy := <-g.newProxies:
-			logger.Debug("New proxy")
-			pool.Add(newProxy)
-			sessionKey := make([]byte, g.settings.SessionKeySize)
-			rand.Read(sessionKey) // always return nil error per documentation
-			cloves, err := utils.NewProxyAck(sessionKey).Split(2, 2)
-			if err == nil {
-				for i, clove := range cloves {
-					logger.Debug("sent ack ", string(clove.SequenceNumber), " to ", newProxy.Paths[i])
-					g.sendToPeer(newProxy.Paths[i], clove.Wrap())
-				}
-			} else {
-				utils.LogObj.Fatal(err.Error())
-			}
-		}
-	}
 }
 
 //================================
@@ -381,31 +220,6 @@ func (g *Gossiper) Start(simple bool, port string) {
 	go g.initiator(3, g.knownPeers, nil)
 	//go g.proxySrv()
 	g.PeersHandle(simple)
-}
-
-func (g *Gossiper) proxySrv() {
-	var buf []byte = make([]byte, 8000)
-	atTCP, err := net.ResolveTCPAddr("tcp", g.directProxyPort)
-	if err != nil {
-		utils.LogObj.Fatal(err.Error(), " dropping cloves")
-		return
-	}
-	connect, err := net.DialTCP("tcp", nil, atTCP)
-	for {
-		_, err := connect.Read(buf)
-		if err == nil {
-			var clove utils.Clove
-			err = protobuf.Decode(buf, &clove)
-			if err == nil {
-				// forward clove to clove handler
-				g.clovesCollector.directs <- &clove
-			} else {
-				utils.LogObj.Fatal(err.Error())
-			}
-		} else {
-			utils.LogObj.Fatal(err.Error())
-		}
-	}
 }
 
 func (g *Gossiper) antiEntropy() {
@@ -872,96 +686,4 @@ func (g *Gossiper) incrementTLCRound() {
 	g.TLC_round_counter_lock.Lock()
 	g.TLC_round_counter += 1
 	g.TLC_round_counter_lock.Unlock()
-}
-
-/*
-NewContent creates a new deliverable content
-*/
-func NewDeliveries(data []byte, initiatorProxies []string, k, nPrime uint) ([]*utils.DataFragment, error) {
-	//assert len(initiatorProxies) == nPrime / 2
-	dPrime := nPrime / 2
-	deliveries := make([]*utils.DataFragment, dPrime)
-	// assert nPrime is even
-	content, err := NewContent(data)
-	if err != nil {
-		return nil, err
-	}
-	contentCloves, err := content.Split(k, nPrime)
-	if err != nil {
-		return nil, err
-	}
-	for i := 0; i < int(dPrime); i++ {
-		encodedCloves := [2][]byte{}
-		for j := 0; j < 2; j++ {
-			encoded, err := protobuf.Encode(contentCloves[i+j])
-			if err != nil {
-				return nil, err
-			}
-			encodedCloves[j] = encoded
-		}
-		delivery := &utils.Delivery{IP: initiatorProxies[i], Cloves: encodedCloves}
-		deliveries[i] = &utils.DataFragment{Delivery: delivery}
-	}
-	//cihpherText := gcm.Seal(nonce, nonce, data, nil)
-	// data is
-	return deliveries, nil
-}
-
-func NewContent(data []byte) (*utils.DataFragment, error) {
-	//generate a key K
-	key := make([]byte, 32) // needs to be 32 bytes?
-	_, err := rand.Read(key)
-	if err != nil {
-		return nil, err
-	}
-	encrypter, err := aes.NewCipher(key)
-	if err != nil {
-		return nil, err
-	}
-	//encrypt F with AES K
-	//encrypt
-	cbc := cipher.NewCBCEncrypter(encrypter, []byte(utils.AES_IV))
-	cipherText := make([]byte, len(data))
-	cbc.CryptBlocks(cipherText, data)
-	df := &utils.DataFragment{Content: &utils.Content{
-		Key:  key,
-		Data: cipherText,
-	}}
-	return df, nil
-}
-
-func (g *Gossiper) deliver(filename string, proxies []string) {
-	logger := utils.LogObj.Named("delivery")
-	d := uint(len(proxies))
-	//get file from filestorage
-	providerProxies, err := g.proxyPool.GetD(d)
-	if err != nil {
-		logger.Fatal(err.Error())
-		return
-	}
-	file, ok := g.fileStorage.data[filename]
-	if !ok {
-		return
-	}
-	n := 2 * d
-	deliveries, err := NewDeliveries(file.data, proxies, 4, n)
-	if err != nil {
-		logger.Fatal(err.Error())
-		return
-	}
-	for i, delivery := range deliveries {
-		cloves, err := delivery.Split(2, 2) // normally we should collect all cloves to make sure that no error occurs
-		if err != nil {
-			logger.Fatal(err.Error())
-			return
-		}
-		for j, clove := range cloves {
-			g.sendToPeer(providerProxies[i].Paths[j], clove.Wrap())
-		}
-	}
-	//split F
-	//split K
-
-	//generate sequence number
-
 }

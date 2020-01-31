@@ -1,3 +1,4 @@
+//Author: Frédéric Gessler
 import React from 'react';
 import ReactDOM from 'react-dom'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
@@ -65,21 +66,36 @@ class ProxyToasts extends React.Component {
     setTimeout(this.update(updatable), 3000)
   }
   repr = node => {
+    const assoc = new Map() // bindings ip -> name
+    const assoc2 = new Map()
+    this.props.map.forEach((peerster, name) => {
+      assoc.set(peerster.gossipAddr, name)
+      assoc2.set(`127.0.0.1:${peerster.direct}`, name)
+    })
     if(this.state.proxies.has(node)) {
-    return <Toast.Body>{this.state.proxies.get(node).proxies.map((proxy, i) => (
-      <Card>
-      <Card.Header>Proxy {i+1}</Card.Header>
-      <Card.Body>
-        <Card.Title>{proxy['IP']}</Card.Title>
-        <Card.Text>
-          <small>path_1</small> {proxy['_1']}
-        </Card.Text>
-        <Card.Text>
-          <small>path_2</small> {proxy['_2']}
-        </Card.Text>
-      </Card.Body>
-    </Card>
-      ))}</Toast.Body>
+    return <Toast.Body>{this.state.proxies.get(node).proxies.map((proxy, i) => {
+
+    let ip = proxy['IP']
+    let path1 = proxy['_1']
+    let path2 = proxy['_2']
+    let name1 = (assoc2.has(ip)) ? assoc2.get(ip) : ip
+    let name2 = (assoc.has(path1)) ? assoc.get(path1) : path1
+    let name3 = (assoc.has(path2)) ? assoc.get(path2) : path2
+      return (
+        <Card>
+        <Card.Header>Proxy {i+1}</Card.Header>
+        <Card.Body>
+          <Card.Title>{name1}</Card.Title>
+          <Card.Text>
+            <small>path_1</small> {name2}
+          </Card.Text>
+          <Card.Text>
+            <small>path_2</small> {name3}
+          </Card.Text>
+        </Card.Body>
+      </Card>
+        )
+    })}</Toast.Body>
     } else {
       return <Toast.Body>No proxies</Toast.Body>
     }
@@ -158,6 +174,7 @@ let gossipPort = new Gen(5000)
 let uiPort = new Gen(7000)
 let httpPort = new Gen(8000)
 let N = new Gen(0)
+let directs = new Gen(10000)
 class Peerster {
   constructor(name) {
     this.name = name 
@@ -165,13 +182,14 @@ class Peerster {
     this.uiport = uiPort.next()
     this.httpPort = httpPort.next()
     this.peers = new Set()
+    this.direct = directs.next()
     N.next()
   }
   peerStr = () => this.peers.size > 0 ? `-peers ${Array.from(this.peers).map(peer => peer.gossipAddr).join(',')}` : ''
   knows = (neighbour) => {
     this.peers.add(neighbour)
   }
-  cmd = () => `./peerster -name ${this.name} -gossipAddr ${this.gossipAddr} -UIPort ${this.uiport} ${this.peerStr()} -N ${N.get()} -GUIPort ${this.httpPort}`
+  cmd = () => `./peerster -name ${this.name} -gossipAddr ${this.gossipAddr} -UIPort ${this.uiport} ${this.peerStr()} -N ${N.get()} -GUIPort ${this.httpPort} -proxy ${this.direct}`
 }
 //id="dropdown-menu-align-right"
 class App extends React.Component {
@@ -203,8 +221,7 @@ class App extends React.Component {
       objs: new Map(),
     })
   }
-  connect = (nodeA, nodeB) => {
-    const k = 3
+  connect = (nodeA, nodeB, k) => {
     const n = 5 * k
     const nodes = []
     const set = new Set() // set of edges (to avoid self-loops and double edges)
@@ -273,7 +290,7 @@ class App extends React.Component {
         break
       case 'Generate':
         const [gA, gB] = this.state.input
-        this.connect(gA, gB)
+        this.connect(gA, gB, 4)
         break
     }
   }
@@ -329,10 +346,10 @@ class App extends React.Component {
             <Button variant="danger" onClick={this.run}>Run</Button>
           </Navbar.Collapse>
         </Navbar>
-        <Network style={{height: '800px'}}>
+        <Network style={{height: window.innerHeight}}>
           {this.state.nodes.map(node => <Node label={node} decorator={() => <Decorator test={this.test(node)}/>} id={node} />)}
           {this.state.edges.map(([u, v], i) => {
-            return <Edge id={i} from={u}  to={v} />
+            return <Edge id={i} from={u} to={v} />
           })}
         </Network>
         <ProxyToasts nodes={[...this.state.tested]} untest={this.untest} map={this.state.objs} />
