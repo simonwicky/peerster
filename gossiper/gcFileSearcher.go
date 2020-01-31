@@ -1,4 +1,4 @@
-
+//Author: Boubacar Camara 
 package gossiper
 
 import (
@@ -22,7 +22,9 @@ type GCFileSearcher struct{
 	g *Gossiper
 	matches []*Match
 	repliesDispatcher map[uint32]chan*utils.GCSearchReply
+	proxiesIP *[]string
 	repliesMux sync.Mutex
+	proxiesMux sync.Mutex
 }
 
 func NewGCFileSearcher(g *Gossiper) *GCFileSearcher {
@@ -68,11 +70,22 @@ func (s *GCFileSearcher) search(keyword []string, sessionKey *[]byte){
 
 	}
 
+	s.proxiesMux.Lock()
+	if s.proxiesIP != nil {
+		ips := make([]string, len(*s.proxiesIP))
+		copy(ips, *s.proxiesIP)
+		searchRequest.ProxiesIP = &ips
+	}
+	s.proxiesMux.Unlock()
+
 	fmt.Println("New GC search ID ", searchRequest.ID)
 	if !s.running {
 		return
 	}
 	s.manageRequest(searchRequest)
+	
+
+
 }
 
 func contains(haystack []*utils.SearchResult, needle *utils.SearchResult) bool{
@@ -93,7 +106,7 @@ func (s *GCFileSearcher) receiveReply(reply *utils.GCSearchReply){
 }
 
 func (s *GCFileSearcher) processReply(channel chan *utils.GCSearchReply, ticker *time.Ticker ){
-	//TODO: modularize select in managerequest here
+	//TODO: modularize select in managerequest here	
 }
 
 /*
@@ -101,6 +114,9 @@ func (s *GCFileSearcher) processReply(channel chan *utils.GCSearchReply, ticker 
 	depending on the gossiper files routing table. 
 */ 
 func (s *GCFileSearcher) manageRequest(searchRequest *utils.GCSearchRequest){
+	s.proxiesMux.Lock()
+	s.proxiesIP = nil
+	s.proxiesMux.Unlock()
 	var receivedResults []*utils.SearchResult
 	fRoutesSorted := s.g.FilesRouting.RoutesSorted(searchRequest.Keywords)
 	
@@ -188,7 +204,7 @@ func (s *GCFileSearcher) manageRequest(searchRequest *utils.GCSearchRequest){
 }	
 
 func (s *GCFileSearcher) SendRequest(searchRequest utils.GCSearchRequest, peer string) bool{
-	fmt.Println(peer, searchRequest.Origin)
+	fmt.Println(peer, searchRequest.Origin, searchRequest.HopLimit)
 
 	if searchRequest.HopLimit <= 0 || peer == searchRequest.Origin{
 		return false

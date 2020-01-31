@@ -308,7 +308,8 @@ func (cc *ClovesCollector) cloveHandler(g *Gossiper, clove *utils.Clove, predece
 				//index file
 			case df.Query != nil :
 				searcher := g.getGCFileSearcher()
-			go searcher.startSearch(df.Query.Keywords, &df.Query.SessionKey)
+				go searcher.startSearch(df.Query.Keywords, &df.Query.SessionKey)
+				//send results back to initiator
 			case df.FileInfo != nil:
 				g.FilesRouting.addOwnerPath(*df.FileInfo,paths)
 			}
@@ -529,16 +530,16 @@ func (g *Gossiper) peerGCSearchRequestHandler(packet *utils.GossipPacket){
 		keywords := packet.GCSearchRequest.Keywords
 		for _, kw := range keywords {
 			//Assuming there is consensus over the file names 
-			if ips :=packet.GCSearchRequest.ProxiesIP; ips != nil && len(keywords) == 1 {
+			if ips :=packet.GCSearchRequest.ProxiesIP; ips != nil /*&& len(keywords) == 1*/ {
 				foundFiles = append(foundFiles, g.fileStorage.lookupFile(kw)...)
 
-				if  foundFiles[0].name == keywords[0]{
+				if  foundFiles[0].name == kw{
 
 					fmt.Println("Deliver file ", kw)
 					g.deliver(kw, *ips)
 				}else {
 					g.FilesRouting.Lock()
-					if len(g.FilesRouting.filesRoutes[keywords[0]].ProxyOwnerPaths) == 2{
+					if len(g.FilesRouting.filesRoutes[kw].ProxyOwnerPaths) == 2{
 						data := &utils.DataFragment{
 							GCSearchRequest: packet.GCSearchRequest,
 						}

@@ -1,3 +1,4 @@
+//author: Boubacar Camara
 package gossiper
 
 import (
@@ -78,7 +79,7 @@ func (filesRouting *FilesRouting) RoutesSorted(keywords []string) []FileRoutes {
 
 //Updates the routing table according to the search reply
 func (filesRouting *FilesRouting) UpdateRouting(reply utils.GCSearchReply){
-	fmt.Println("print before Update files routing table")
+	//fmt.Println("print before Update files routing table")
 	utils.LogGCSearchReply(&reply)
 
 	for _, result := range reply.AccessibleFiles {

@@ -173,7 +173,18 @@ func (g *Gossiper) keywordsHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		body, _ := ioutil.ReadAll(r.Body)
 		keywords := string(body)
-		matches := g.uiFileSearchHandler(keywords)
+		matches := g.uiFileSearchHandler(keywords, false)
+		fmt.Fprintf(w, matches)
+	}
+}
+
+func (g *Gossiper) keywordsProxiesHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case "POST":
+		w.WriteHeader(http.StatusOK)
+		body, _ := ioutil.ReadAll(r.Body)
+		keywords := string(body)
+		matches := g.uiFileSearchHandler(keywords, true)
 		fmt.Fprintf(w, matches)
 	}
 }

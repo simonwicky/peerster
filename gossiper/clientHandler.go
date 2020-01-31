@@ -116,15 +116,18 @@ func (g *Gossiper) clientFileSearchHandler(message *utils.Message) {
 
 func(g *Gossiper) clientGCFileSearchHandler(message *utils.Message) {
 	searcher := g.getGCFileSearcher()
+	d := uint(len(g.proxyPool.proxies))
+
+	providerProxies, err := g.proxyPool.GetD(d)
+
 	if message.UseProxy != nil && *message.UseProxy{
 		data := utils.DataFragment{
 			Query: &utils.Query{Keywords: strings.Split(*message.Keywords,",")},
 		}
 		logger := utils.LogObj.Named("postFile")
-		d := uint(len(g.proxyPool.proxies))
 
 		//get file from filestorage
-		providerProxies, err := g.proxyPool.GetD(d)
+		//providerProxies, err := g.proxyPool.GetD(d)
 		if err != nil {
 			logger.Fatal(err.Error())
 			return
@@ -146,6 +149,14 @@ func(g *Gossiper) clientGCFileSearchHandler(message *utils.Message) {
 	}else {
 		if !searcher.running {
 			keywords := strings.Split(*message.Keywords,",")
+			ips := make([]string, len(providerProxies))
+			for _, p := range providerProxies{
+				ips =append(ips, p.IP)
+
+			}
+			searcher.proxiesMux.Lock()
+			searcher.proxiesIP = &ips
+			searcher.proxiesMux.Unlock()
 			go searcher.startSearch(keywords, nil)
 		} else {
 			fmt.Fprintln(os.Stderr,"File search already running")

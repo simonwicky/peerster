@@ -54,21 +54,15 @@ func(g *Gossiper) getIdentifiers() string {
 	return g.dumpDSDV()
 }
 
-func (g *Gossiper) uiFileSearchHandler(keywords string) string{
-	searcher := g.getFileSearcher()
-	if !searcher.running {
-		keywords := strings.Split(keywords,",")
-		searcher.Start(2,keywords)
+func (g *Gossiper) uiFileSearchHandler(keywords string, useProxy bool) string{
+	gc:= true
+	msg := utils.Message{
+		Keywords:&keywords, 
+		UseProxy:&useProxy,
+		GC:&gc,
 	}
-	matches := searcher.getMatches()
-	if len(matches) == 0 {
-		return ""
-	}
-	var names []string
-	for _,m := range matches {
-		names = append(names,m.name)
-	}
-	return strings.Join(names,",")
+	g.clientGCFileSearchHandler(&msg)
+	return ""
 }
 
 func (g *Gossiper) uiGetTLCMessages() string {

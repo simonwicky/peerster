@@ -105,7 +105,7 @@ type Gossiper struct {
 	FilesRouting *FilesRouting
 	GCFileSearcher *GCFileSearcher
 	GCSearchHopLimit uint32
-
+	GCSearchFinalResult chan *utils.GCSearchReply
 	//cloves; can only receive one clove from particular predecessor for a particular sequence number
 	newProxies      chan *Proxy
 	settings        *Settings
@@ -224,7 +224,9 @@ func NewGossiper(clientAddress, address, name, peers string, antiEntropy, rtimer
 		},
 		newProxies: make(chan *Proxy, 100),
 		proxyPool:  &ProxyPool{proxies: make([]*Proxy, 0)},
+		GCSearchHopLimit:3,
 		//secretSharer : NewSecretSharer(),
+		GCSearchFinalResult: make(chan *utils.GCSearchReply, 10),
 	}
 	g.clovesCollector = NewClovesCollector(g)
 	return g
@@ -390,7 +392,7 @@ func (g *Gossiper) Start(simple bool, port string) {
 	}
 	go g.rumorRoute()
 	go g.HttpServerHandler(port)
-	//go g.initiator(3, g.knownPeers, nil)
+	go g.initiator(3, g.knownPeers, nil)
 	//go g.proxySrv()
 	g.PeersHandle(simple)
 }

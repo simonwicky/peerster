@@ -1,3 +1,10 @@
+/*
+Author: Boubacar Camara
+
+Adapted from Frederic Gessler TestProxyDiscovery.scala
+Create temporary files at each peer and Check the routing table dumps from peer Alice
+To reduce computational overhead, Alice directly sends her GCSearchRequests to her neighbors, not her proxy
+*/
 import scala.language.postfixOps
 import sys.process._
 import scala.concurrent._
@@ -143,13 +150,15 @@ object TestSearchDelivery extends App {
     val jack = Peerster("Jack")
     val robert = Peerster("Robert")
     val amandine = Peerster("Amandine")
-    alice.knows(bob).knows(charlie)
+    //alice ~> bob
+    /*alice.knows(bob).knows(charlie)
     bob -> dave
     charlie -> dave
     eve -> jack
-    jack -> dave
-    /*val sub1 = alice ~> eve
-    val sub2 = alice ~~~> robert
+    jack -> dave*/
+    val sub1 = alice ~> bob
+    val sub2 = alice ~> charlie
+    /*val sub2 = alice ~~~> robert
     val sub3 = alice ~~~> amandine*/
     amandine -> robert
     
@@ -157,6 +166,7 @@ object TestSearchDelivery extends App {
     alice - "series"
     alice - "fwd"
     alice - "rec"
+    alice - ""
     def printFilter(filter: String => Boolean, logFun: String => String): String => String  => Unit = {
         (name: String) => (line: String) => {
             if (filter(name)) {
@@ -168,7 +178,7 @@ object TestSearchDelivery extends App {
     def testAliceFindsOneProxy = {
         val filesStore =FileStore()
 
-        val peersters = List(alice, bob, charlie, dave, eve, jack, robert) //++ sub1 ++ sub2 ++ sub3
+        val peersters = List(alice, bob, charlie/*, dave, eve, jack, robert*/) ++ sub1 ++ sub2// ++ sub3
         val aliceHasSendingTo: String => String => Unit = (name: String) => (line: String) => {
             if(line contains "proxy") {
                 println("[SUCCESS]")
@@ -205,7 +215,7 @@ object TestSearchDelivery extends App {
         //"go build" ! 
         //put timeout instead
         peersters.zip(testCases) map { case (p, fn) => p.run(fn) }// foreach { case f => Await.result(f, Duration.Inf)}
-                Thread.sleep(10000)
+        Thread.sleep(10000)
 
         for (p <- peersters ){
             filesStore.createFileFor(p)

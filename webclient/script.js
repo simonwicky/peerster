@@ -173,6 +173,33 @@ $(document).ready(function(){
 			}
 		});
 	});
+	$("#keywords_button_proxies").click(function(){
+		var keywords = $("#keywords").val();
+		var matchBox = document.getElementById("match-box");
+		matchBox.innerHTML = "";
+		$.ajax({
+			type: "POST",
+			url:"/keywords_proxies",
+			data:keywords,
+			success:function(data) {
+				var list = data.split(",");
+				var ul = document.createElement("ul");
+				ul.id = "match-list"
+				for(var i = 0; i < list.length; i++){
+					var li = document.createElement("li");
+					li.innerHTML = list[i];
+					li.id = "match" + i;
+					li.addEventListener("dblclick",function(e){
+						download_file(e);
+					});
+					ul.appendChild(li);
+				}
+				var matchBox = document.getElementById("match-box");
+				matchBox.innerHTML = "";
+				matchBox.appendChild(ul);
+			}
+		});
+	});
 
 	function download_file(e){
 		$.ajax({

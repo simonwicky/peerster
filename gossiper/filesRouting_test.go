@@ -1,3 +1,4 @@
+//Author: Boubacar Camara
 package gossiper
 
 import (
