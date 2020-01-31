@@ -2,7 +2,7 @@
 Author: Boubacar Camara
 
 Adapted from Frederic Gessler TestProxyDiscovery.scala
-Create temporary files at each peer and Check the routing table dumps from peer Alice
+Create temporary files at each peer and Check the routing table dumps from Alice
 To reduce computational overhead, Alice directly sends her GCSearchRequests to her neighbors, not her proxy
 */
 import scala.language.postfixOps
@@ -211,7 +211,10 @@ object TestSearchDelivery extends App {
         //create map instead
         val testCases: List[String => String => Unit] = List(hasMultipleProxies).map(i => ((s: String) => printFilter(l => !l.contains("enough available") , line => line) (s) )) ++ 1.until(peersters.size)
         .map(i => ((s: String) => printFatals(s)))
-        .map(i => ((s: String) => printFilter(l => true /*l contains ".txt"*/, line => line) (s) ))
+        .map(i => ((s: String) => printFilter(l =>  l.contains(".txt") || l.contains(")")  || l.contains("Garlic Cast"), line => line) (s) ))
+        //.map(i => ((s: String) => printFilter(l =>  true, line => line) (s) ))
+        //Uncomment line above to print all logs
+
 
         //"go build" ! 
         //put timeout instead
